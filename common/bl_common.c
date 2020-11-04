@@ -86,7 +86,7 @@ static int load_image(unsigned int image_id, image_info_t *image_data)
 	io_result = plat_get_image_source(image_id, &dev_handle, &image_spec);
 	if (io_result != 0) {
 		WARN("Failed to obtain reference to image id=%u (%i)\n",
-			image_id, io_result);
+		     image_id, io_result);
 		return io_result;
 	}
 
@@ -94,17 +94,18 @@ static int load_image(unsigned int image_id, image_info_t *image_data)
 	io_result = io_open(dev_handle, image_spec, &image_handle);
 	if (io_result != 0) {
 		WARN("Failed to access image id=%u (%i)\n",
-			image_id, io_result);
+		     image_id, io_result);
 		return io_result;
 	}
 
-	INFO("Loading image id=%u at address 0x%lx\n", image_id, image_base);
+	INFO("Loading image id=%u at address %08lx\n", image_id,
+	     image_base);
 
 	/* Find the size of the image */
 	io_result = io_size(image_handle, &image_size);
 	if ((io_result != 0) || (image_size == 0U)) {
 		WARN("Failed to determine the size of the image id=%u (%i)\n",
-			image_id, io_result);
+		     image_id, io_result);
 		goto exit;
 	}
 
@@ -129,9 +130,8 @@ static int load_image(unsigned int image_id, image_info_t *image_data)
 		goto exit;
 	}
 
-	INFO("Image id=%u loaded: 0x%lx - 0x%lx\n", image_id, image_base,
-	     (uintptr_t)(image_base + image_size));
-
+	INFO("Image id=%u loaded: %08lx - %08lx\n", image_id, image_base,
+	     image_base + image_size);
 exit:
 	(void)io_close(image_handle);
 	/* Ignore improbable/unrecoverable error in 'close' */

@@ -26,6 +26,7 @@ static uint32_t usbd_detach_req;
  */
 static uint8_t usb_dfu_init(usb_handle_t *pdev, uint8_t cfgidx)
 {
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Nothing to do in this stage */
 	return USBD_OK;
 }
@@ -39,6 +40,7 @@ static uint8_t usb_dfu_init(usb_handle_t *pdev, uint8_t cfgidx)
  */
 static uint8_t usb_dfu_de_init(usb_handle_t *pdev, uint8_t cfgidx)
 {
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Nothing to do in this stage */
 	return USBD_OK;
 }
@@ -55,6 +57,7 @@ static uint8_t  usb_dfu_data_in(usb_handle_t *pdev, uint8_t epnum)
 	(void)pdev;
 	(void)epnum;
 
+	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -67,8 +70,9 @@ static uint8_t  usb_dfu_data_in(usb_handle_t *pdev, uint8_t epnum)
  */
 static void usb_dfu_leave(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	hdfu->manif_state = DFU_MANIFEST_COMPLETE;
 
 	if (DFU_BM_ATTRIBUTE & 0x04) {
@@ -101,6 +105,7 @@ static uint8_t usb_dfu_ep0_rx_ready(usb_handle_t *pdev)
 {
 	(void)pdev;
 
+	VERBOSE("%s@%d: pdev=%p\n", __func__, __LINE__, pdev);
 	return USBD_OK;
 }
 
@@ -112,15 +117,16 @@ static uint8_t usb_dfu_ep0_rx_ready(usb_handle_t *pdev)
  */
 static uint8_t usb_dfu_ep0_tx_ready(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
-	uint16_t len, dfu_version = 0;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
+	uint16_t len, dfu_version;
 	uint8_t *serial = pdev->desc->get_dfu_desc(&len);
 
+	VERBOSE("%s@%d: pdev=%p\n", __func__, __LINE__, pdev);
 	dfu_version = serial[len - 1] << 8 | serial[len - 2];
 
 	if (hdfu->dev_state == DFU_STATE_DNLOAD_BUSY) {
 		if (dfu_version == 0x011a) {
-			/* Decode the Special Command*/
+			/* Decode the Special Command */
 			if (hdfu->wblock_num == 0) {
 				if (hdfu->buffer[0] ==
 				     DFU_CMD_SETADDRESSPOINTER &&
@@ -155,12 +161,10 @@ static uint8_t usb_dfu_ep0_tx_ready(usb_handle_t *pdev)
 		}
 		if ((hdfu->wblock_num > 1 && dfu_version == 0x011a) ||
 		    dfu_version != 0x011a) {
+			usb_dfu_media_t *p = pdev->user_data;
 			/* Perform the write operation */
-			if (((usb_dfu_media_t *)
-			     pdev->user_data)->write_done((uint32_t *)
-							  hdfu->data_ptr,
-							  hdfu->wlength)
-			    != USBD_OK)
+			if (p->write_done((uint32_t *)hdfu->data_ptr,
+					   hdfu->wlength) != USBD_OK)
 				return USBD_FAIL;
 		}
 
@@ -194,6 +198,7 @@ static uint8_t usb_dfu_sof(usb_handle_t *pdev)
 {
 	(void)pdev;
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	return USBD_OK;
 }
 
@@ -208,6 +213,7 @@ static uint8_t usb_dfu_iso_in_incomplete(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
+	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -222,6 +228,7 @@ static uint8_t usb_dfu_iso_out_incomplete(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
+	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -236,6 +243,7 @@ static uint8_t usb_dfu_data_out(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
+	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -248,7 +256,7 @@ static uint8_t usb_dfu_data_out(usb_handle_t *pdev, uint8_t epnum)
  */
 static void usb_dfu_detach(usb_handle_t *pdev, usb_setup_req_t *req)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
 	INFO("Receive Detach\n");
 
@@ -281,8 +289,9 @@ static void usb_dfu_detach(usb_handle_t *pdev, usb_setup_req_t *req)
  */
 static void usb_dfu_download(usb_handle_t *pdev, usb_setup_req_t *req)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Data setup request */
 	if (req->length > 0) {
 		if ((hdfu->dev_state == DFU_STATE_IDLE) ||
@@ -305,8 +314,7 @@ static void usb_dfu_download(usb_handle_t *pdev, usb_setup_req_t *req)
 			pdev->ep_out[0].rem_length   = hdfu->wlength;
 
 			/* Start the transfer */
-			usb_core_receive(pdev,
-					 0,
+			usb_core_receive(pdev, 0,
 					 (uint8_t *)usbd_dfu_download_address,
 					 hdfu->wlength);
 
@@ -346,8 +354,9 @@ static void usb_dfu_download(usb_handle_t *pdev, usb_setup_req_t *req)
  */
 static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Data setup request */
 	if (req->length > 0) {
 		if ((hdfu->dev_state == DFU_STATE_IDLE) ||
@@ -368,23 +377,16 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 				hdfu->dev_status[3] = 0;
 				hdfu->dev_status[4] = hdfu->dev_state;
 
-				INFO("UPLOAD :\n");
-				INFO("\t\tPhase ID : %i\n", usbd_dfu_phase_id);
+				INFO("UPLOAD:\n");
+				INFO("\t\tPhase ID: %i\n", usbd_dfu_phase_id);
 				INFO("\t\taddress 0x%lx\n",
 				     usbd_dfu_download_address);
 
 				hdfu->buffer[0] = usbd_dfu_phase_id;
-				hdfu->buffer[1] = (uint8_t)
-						  (usbd_dfu_download_address);
-				hdfu->buffer[2] = (uint8_t)
-						  (usbd_dfu_download_address >>
-						   8);
-				hdfu->buffer[3] = (uint8_t)
-						  (usbd_dfu_download_address >>
-						   16);
-				hdfu->buffer[4] = (uint8_t)
-						  (usbd_dfu_download_address >>
-						   24);
+				hdfu->buffer[1] = usbd_dfu_download_address;
+				hdfu->buffer[2] = usbd_dfu_download_address >> 8;
+				hdfu->buffer[3] = usbd_dfu_download_address >> 16;
+				hdfu->buffer[4] = usbd_dfu_download_address >> 24;
 
 				hdfu->buffer[5] = 0x00;
 				hdfu->buffer[6] = 0x00;
@@ -392,8 +394,8 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 				hdfu->buffer[8] = 0x00;
 
 				if ((usbd_dfu_download_address ==
-				    UNDEFINE_DOWN_ADDR) &&
-				   (usbd_detach_req)) {
+				     UNDEFINE_DOWN_ADDR) &&
+				    usbd_detach_req) {
 					INFO("Send detach request\n");
 					hdfu->buffer[9] = 0x01;
 					pdev->ep_in[0].total_length = 10;
@@ -407,11 +409,11 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 				pdev->ep0_state = USBD_EP0_DATA_IN;
 				/* Start the transfer */
 				usb_core_transmit(pdev, 0x00,
-						  (uint8_t *)&hdfu->buffer[0],
+						  &hdfu->buffer[0],
 						  pdev->ep_in[0].total_length);
 			} else {
 				/* unsupported hdfu->wblock_num */
-				ERROR("UPLOAD : Unsupported block : %i\n",
+				ERROR("UPLOAD: Unsupported block: %i\n",
 				      hdfu->wblock_num);
 
 				hdfu->dev_state = DFU_ERROR_STALLEDPKT;
@@ -428,7 +430,7 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 			}
 		} else {
 			/* Unsupported state */
-			ERROR("UPLOAD : Unsupported State\n");
+			ERROR("UPLOAD: Unsupported State\n");
 
 			hdfu->wlength = 0;
 			hdfu->wblock_num = 0;
@@ -439,7 +441,7 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 		}
 	} else {
 		/* No Data setup request */
-		INFO("USB : DFU : Nothing to do\n");
+		INFO("USB: DFU: Nothing to do\n");
 		hdfu->dev_state = DFU_STATE_IDLE;
 
 		hdfu->dev_status[1] = 0;
@@ -457,13 +459,15 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
  */
 static void usb_dfu_get_status(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 	uint16_t status;
 	uint8_t dfu_bm_attribute = DFU_BM_ATTRIBUTE;
+	usb_dfu_media_t *p = pdev->user_data;
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	switch (hdfu->dev_state) {
 	case DFU_STATE_DNLOAD_SYNC:
-		status = ((usb_dfu_media_t *)pdev->user_data)->get_status();
+		status = p->get_status();
 
 		switch (status) {
 		case DFU_MEDIA_STATE_WRITTEN:
@@ -499,7 +503,7 @@ static void usb_dfu_get_status(usb_handle_t *pdev)
 			hdfu->dev_status[4] = hdfu->dev_state;
 		} else if ((hdfu->manif_state == DFU_MANIFEST_COMPLETE) &&
 			   (dfu_bm_attribute & 0x04)) {
-			INFO("USB : DFU : end of download partition : %i\n",
+			INFO("USB: DFU: end of download partition: %i\n",
 			     hdfu->alt_setting);
 			hdfu->dev_state = DFU_STATE_IDLE;
 			usbd_dfu_operation_complete = 1;
@@ -520,7 +524,7 @@ static void usb_dfu_get_status(usb_handle_t *pdev)
 	pdev->ep_in[0].total_length = 6;
 	pdev->ep_in[0].rem_length = 6;
 	/* Start the transfer */
-	usb_core_transmit(pdev, 0x00, (uint8_t *)&hdfu->dev_status[0], 6);
+	usb_core_transmit(pdev, 0x00, &hdfu->dev_status[0], 6);
 }
 
 /*
@@ -531,7 +535,7 @@ static void usb_dfu_get_status(usb_handle_t *pdev)
  */
 static void usb_dfu_clear_status(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
 	if (hdfu->dev_state == DFU_STATE_ERROR) {
 		hdfu->dev_state = DFU_STATE_IDLE;
@@ -561,7 +565,7 @@ static void usb_dfu_clear_status(usb_handle_t *pdev)
  */
 static void usb_dfu_get_state(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
 	/* Return the current state of the DFU interface */
 	/* Send the status data over EP0 */
@@ -581,7 +585,7 @@ static void usb_dfu_get_state(usb_handle_t *pdev)
  */
 static void usb_dfu_abort(usb_handle_t *pdev)
 {
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
 	if (hdfu->dev_state == DFU_STATE_IDLE ||
 	    hdfu->dev_state == DFU_STATE_DNLOAD_SYNC ||
@@ -610,13 +614,13 @@ static void usb_dfu_abort(usb_handle_t *pdev)
 static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 {
 	uint8_t *pbuf = NULL;
-	uint16_t len = 0;
+	uint16_t len;
 	uint8_t ret = USBD_OK;
-	usb_dfu_handle_t *hdfu = (usb_dfu_handle_t *)pdev->class_data;
+	usb_dfu_handle_t *hdfu = pdev->class_data;
 
-	VERBOSE("alt_setting %i, bmRequest : 0x%x, brequest : 0x%x\n",
+	VERBOSE("alt_setting %i, bmRequest: 0x%x, brequest: 0x%x len: %u value: 0x%02x\n",
 		hdfu->alt_setting, req->bm_request & USB_REQ_TYPE_MASK,
-		req->b_request);
+		req->b_request, req->length, req->value);
 	switch (req->bm_request & USB_REQ_TYPE_MASK) {
 	case USB_REQ_TYPE_CLASS:
 		usbd_dfu_current_req = req->b_request;
@@ -651,7 +655,7 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 				break;
 
 			default:
-				ERROR("phase ID :%i\n", usbd_dfu_phase_id);
+				ERROR("phase ID: %i\n", usbd_dfu_phase_id);
 				usb_core_ctl_error(pdev);
 				ret = USBD_FAIL;
 				break;
@@ -663,7 +667,7 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 				break;
 
 			case DFU_GETSTATUS:
-				INFO("GETSTATUS :\n");
+				INFO("GETSTATUS:\n");
 				usb_dfu_get_status(pdev);
 
 				switch (hdfu->dev_state) {
@@ -711,7 +715,7 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 				break;
 
 			case DFU_GETSTATE:
-				INFO("GETSTATE :\n");
+				INFO("GETSTATE:\n");
 				usb_dfu_get_state(pdev);
 
 				switch (hdfu->dev_state) {
@@ -763,13 +767,13 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 				break;
 
 			default:
-				ERROR("phase ID :%i\n", DFU_GET_PHASE);
+				ERROR("phase ID: %i\n", DFU_GET_PHASE);
 				usb_core_ctl_error(pdev);
 				ret = USBD_FAIL;
 				break;
 			}
 		} else {
-			ERROR("Unknown alternate : %i\n", hdfu->alt_setting);
+			ERROR("Unknown alternate: %i\n", hdfu->alt_setting);
 			ret = USBD_FAIL;
 		}
 		break;
@@ -799,7 +803,7 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 			break;
 
 		case USB_REQ_SET_INTERFACE:
-			hdfu->alt_setting = (uint8_t)(req->value);
+			hdfu->alt_setting = req->value;
 			break;
 
 		default:
@@ -815,17 +819,16 @@ static uint8_t usb_dfu_setup(usb_handle_t *pdev, usb_setup_req_t *req)
 }
 
 static const usb_class_t  USBD_DFU_initvalue = {
-	usb_dfu_init,
-	usb_dfu_de_init,
-	usb_dfu_setup,
-	usb_dfu_ep0_tx_ready,
-	usb_dfu_ep0_rx_ready,
-	usb_dfu_data_in,
-	usb_dfu_data_out,
-	usb_dfu_sof,
-	usb_dfu_iso_in_incomplete,
-	usb_dfu_iso_out_incomplete,
-	0
+	.init =			usb_dfu_init,
+	.de_init =		usb_dfu_de_init,
+	.setup =		usb_dfu_setup,
+	.ep0_tx_sent =		usb_dfu_ep0_tx_ready,
+	.ep0_rx_ready =		usb_dfu_ep0_rx_ready,
+	.data_in =		usb_dfu_data_in,
+	.data_out =		usb_dfu_data_out,
+	.sof =			usb_dfu_sof,
+	.iso_in_incomplete =	usb_dfu_iso_in_incomplete,
+	.iso_out_incomplete =	usb_dfu_iso_out_incomplete,
 };
 
 void usb_dfu_register_callback(usb_handle_t *pdev)

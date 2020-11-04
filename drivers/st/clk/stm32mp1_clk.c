@@ -287,78 +287,78 @@ struct stm32mp1_pll_settings {
 };
 
 /* Clocks with selectable source and non set/clr register access */
-#define _CLK_SELEC(sec, off, b, idx, s)			\
-	{						\
-		.offset = (off),			\
-		.bit = (b),				\
-		.index = (idx),				\
-		.set_clr = 0,				\
-		.secure = (sec),			\
-		.sel = (s),				\
-		.fixed = _UNKNOWN_ID,			\
+#define _CLK_SELEC(sec, off, b, idx, s)		\
+	{					\
+		.offset = off,			\
+		.bit = b,			\
+		.index = idx,			\
+		.set_clr = 0,			\
+		.secure = sec,			\
+		.sel = s,			\
+		.fixed = _UNKNOWN_ID,		\
 	}
 
 /* Clocks with fixed source and non set/clr register access */
-#define _CLK_FIXED(sec, off, b, idx, f)			\
-	{						\
-		.offset = (off),			\
-		.bit = (b),				\
-		.index = (idx),				\
-		.set_clr = 0,				\
-		.secure = (sec),			\
-		.sel = _UNKNOWN_SEL,			\
-		.fixed = (f),				\
+#define _CLK_FIXED(sec, off, b, idx, f)		\
+	{					\
+		.offset = off,			\
+		.bit = b,			\
+		.index = idx,			\
+		.set_clr = 0,			\
+		.secure = sec,			\
+		.sel = _UNKNOWN_SEL,		\
+		.fixed = f,			\
 	}
 
 /* Clocks with selectable source and set/clr register access */
-#define _CLK_SC_SELEC(sec, off, b, idx, s)			\
-	{						\
-		.offset = (off),			\
-		.bit = (b),				\
-		.index = (idx),				\
-		.set_clr = 1,				\
-		.secure = (sec),			\
-		.sel = (s),				\
-		.fixed = _UNKNOWN_ID,			\
+#define _CLK_SC_SELEC(sec, off, b, idx, s)	\
+	{					\
+		.offset = off,			\
+		.bit = b,			\
+		.index = idx,			\
+		.set_clr = 1,			\
+		.secure = sec,			\
+		.sel = s,			\
+		.fixed = _UNKNOWN_ID,		\
 	}
 
 /* Clocks with fixed source and set/clr register access */
-#define _CLK_SC_FIXED(sec, off, b, idx, f)			\
-	{						\
-		.offset = (off),			\
-		.bit = (b),				\
-		.index = (idx),				\
-		.set_clr = 1,				\
-		.secure = (sec),			\
-		.sel = _UNKNOWN_SEL,			\
-		.fixed = (f),				\
+#define _CLK_SC_FIXED(sec, off, b, idx, f)	\
+	{					\
+		.offset = off,			\
+		.bit = b,			\
+		.index = idx,			\
+		.set_clr = 1,			\
+		.secure = sec,			\
+		.sel = _UNKNOWN_SEL,		\
+		.fixed = f,			\
 	}
 
-#define _CLK_PARENT_SEL(_label, _rcc_selr, _parents)		\
-	[_ ## _label ## _SEL] = {				\
-		.offset = _rcc_selr,				\
-		.src = _rcc_selr ## _ ## _label ## SRC_SHIFT,	\
-		.msk = (_rcc_selr ## _ ## _label ## SRC_MASK) >> \
-			(_rcc_selr ## _ ## _label ## SRC_SHIFT), \
-		.parent = (_parents),				\
-		.nb_parent = ARRAY_SIZE(_parents)		\
+#define _CLK_PARENT_SEL(_label, _rcc_selr, _parents)			\
+	[_ ## _label ## _SEL] = {					\
+		.offset = _rcc_selr,					\
+		.src = _rcc_selr ## _ ## _label ## SRC_SHIFT,		\
+		.msk = (_rcc_selr ## _ ## _label ## SRC_MASK) >>	\
+			(_rcc_selr ## _ ## _label ## SRC_SHIFT),	\
+		.parent = (_parents),					\
+		.nb_parent = ARRAY_SIZE(_parents)			\
 	}
 
-#define _CLK_PLL(idx, type, off1, off2, off3,		\
-		 off4, off5, off6,			\
-		 p1, p2, p3, p4)			\
-	[(idx)] = {					\
-		.plltype = (type),			\
-		.rckxselr = (off1),			\
-		.pllxcfgr1 = (off2),			\
-		.pllxcfgr2 = (off3),			\
-		.pllxfracr = (off4),			\
-		.pllxcr = (off5),			\
-		.pllxcsgr = (off6),			\
-		.refclk[0] = (p1),			\
-		.refclk[1] = (p2),			\
-		.refclk[2] = (p3),			\
-		.refclk[3] = (p4),			\
+#define _CLK_PLL(idx, type, off1, off2, off3,	\
+		 off4, off5, off6,		\
+		 p1, p2, p3, p4)		\
+	[idx] = {				\
+		.plltype = type,		\
+		.rckxselr = off1,		\
+		.pllxcfgr1 = off2,		\
+		.pllxcfgr2 = off3,		\
+		.pllxfracr = off4,		\
+		.pllxcr = off5,			\
+		.pllxcsgr = off6,		\
+		.refclk[0] = p1,		\
+		.refclk[1] = p2,		\
+		.refclk[2] = p3,		\
+		.refclk[3] = p4,		\
 	}
 
 #define NB_GATES	ARRAY_SIZE(stm32mp1_clk_gate)
@@ -803,9 +803,9 @@ static int stm32mp1_clk_get_gated_id(unsigned long id)
 		}
 	}
 
-	ERROR("%s: clk id %d not found\n", __func__, (uint32_t)id);
+	ERROR("%s: clk id %lu not found\n", __func__, id);
 
-	return -EINVAL;
+	return -ENOENT;
 }
 
 static enum stm32mp1_parent_sel stm32mp1_clk_get_sel(int i)
@@ -1213,7 +1213,7 @@ static void __stm32mp1_clk_enable(unsigned long id, bool with_refcnt)
 
 	i = stm32mp1_clk_get_gated_id(id);
 	if (i < 0) {
-		ERROR("Clock %d can't be enabled\n", (uint32_t)id);
+		ERROR("Clock %lu can't be enabled: %d\n", id, i);
 		panic();
 	}
 
@@ -1257,7 +1257,7 @@ static void __stm32mp1_clk_disable(unsigned long id, bool with_refcnt)
 
 	i = stm32mp1_clk_get_gated_id(id);
 	if (i < 0) {
-		ERROR("Clock %d can't be disabled\n", (uint32_t)id);
+		ERROR("Clock %lu can't be disabled\n", id);
 		panic();
 	}
 

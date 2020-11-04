@@ -280,7 +280,7 @@ static void set_reg(const struct ddr_info *priv,
 		uintptr_t ptr = base_addr + desc[i].offset;
 
 		if (desc[i].par_offset == INVALID_OFFSET) {
-			ERROR("invalid parameter offset for %s", desc[i].name);
+			ERROR("invalid parameter offset for %s\n", desc[i].name);
 			panic();
 		} else {
 			value = *((uint32_t *)((uintptr_t)param +
@@ -330,9 +330,9 @@ static void stm32mp1_ddrphy_idone_wait(struct stm32mp1_ddrphy *phy)
 			VERBOSE("Read Valid Training Intermittent Error\n");
 			error++;
 		}
-	} while (((pgsr & DDRPHYC_PGSR_IDONE) == 0U) && (error == 0));
-	VERBOSE("\n[0x%lx] pgsr = 0x%x\n",
-		(uintptr_t)&phy->pgsr, pgsr);
+	} while ((pgsr & DDRPHYC_PGSR_IDONE) == 0U && error == 0);
+	VERBOSE("[%p] pgsr = 0x%08x\n",
+		&phy->pgsr, pgsr);
 }
 
 static void stm32mp1_ddrphy_init(struct stm32mp1_ddrphy *phy, uint32_t pir)
@@ -340,8 +340,7 @@ static void stm32mp1_ddrphy_init(struct stm32mp1_ddrphy *phy, uint32_t pir)
 	uint32_t pir_init = pir | DDRPHYC_PIR_INIT;
 
 	mmio_write_32((uintptr_t)&phy->pir, pir_init);
-	VERBOSE("[0x%lx] pir = 0x%x -> 0x%x\n",
-		(uintptr_t)&phy->pir, pir_init,
+	VERBOSE("[%p] pir = 0x%08x -> 0x%08x\n", &phy->pir, pir_init,
 		mmio_read_32((uintptr_t)&phy->pir));
 
 	/* Need to wait 10 configuration clock before start polling */
@@ -355,8 +354,8 @@ static void stm32mp1_ddrphy_init(struct stm32mp1_ddrphy *phy, uint32_t pir)
 static void stm32mp1_start_sw_done(struct stm32mp1_ddrctl *ctl)
 {
 	mmio_clrbits_32((uintptr_t)&ctl->swctl, DDRCTRL_SWCTL_SW_DONE);
-	VERBOSE("[0x%lx] swctl = 0x%x\n",
-		(uintptr_t)&ctl->swctl,  mmio_read_32((uintptr_t)&ctl->swctl));
+	VERBOSE("[%p] swctl = 0x%08x\n", &ctl->swctl,
+		mmio_read_32((uintptr_t)&ctl->swctl));
 }
 
 /* Wait quasi dynamic register update */
@@ -366,21 +365,19 @@ static void stm32mp1_wait_sw_done_ack(struct stm32mp1_ddrctl *ctl)
 	uint32_t swstat;
 
 	mmio_setbits_32((uintptr_t)&ctl->swctl, DDRCTRL_SWCTL_SW_DONE);
-	VERBOSE("[0x%lx] swctl = 0x%x\n",
-		(uintptr_t)&ctl->swctl, mmio_read_32((uintptr_t)&ctl->swctl));
+	VERBOSE("[%p] swctl = 0x%08x\n", &ctl->swctl,
+		mmio_read_32((uintptr_t)&ctl->swctl));
 
 	timeout = timeout_init_us(TIMEOUT_US_1S);
 	do {
 		swstat = mmio_read_32((uintptr_t)&ctl->swstat);
-		VERBOSE("[0x%lx] swstat = 0x%x ",
-			(uintptr_t)&ctl->swstat, swstat);
+		VERBOSE("[%p] swstat = 0x%08x\n", &ctl->swstat, swstat);
 		if (timeout_elapsed(timeout)) {
 			panic();
 		}
 	} while ((swstat & DDRCTRL_SWSTAT_SW_DONE_ACK) == 0U);
 
-	VERBOSE("[0x%lx] swstat = 0x%x\n",
-		(uintptr_t)&ctl->swstat, swstat);
+	VERBOSE("[%p] swstat = 0x%08x\n", &ctl->swstat, swstat);
 }
 
 /* Wait quasi dynamic register update */
@@ -398,8 +395,7 @@ static void stm32mp1_wait_operating_mode(struct ddr_info *priv, uint32_t mode)
 		stat = mmio_read_32((uintptr_t)&priv->ctl->stat);
 		operating_mode = stat & DDRCTRL_STAT_OPERATING_MODE_MASK;
 		selref_type = stat & DDRCTRL_STAT_SELFREF_TYPE_MASK;
-		VERBOSE("[0x%lx] stat = 0x%x\n",
-			(uintptr_t)&priv->ctl->stat, stat);
+		VERBOSE("[%p] stat = 0x%08x\n", &priv->ctl->stat, stat);
 		if (timeout_elapsed(timeout)) {
 			panic();
 		}
@@ -428,8 +424,7 @@ static void stm32mp1_wait_operating_mode(struct ddr_info *priv, uint32_t mode)
 		}
 	}
 
-	VERBOSE("[0x%lx] stat = 0x%x\n",
-		(uintptr_t)&priv->ctl->stat, stat);
+	VERBOSE("[%p] stat = 0x%08x\n", &priv->ctl->stat, stat);
 }
 
 /* Mode Register Writes (MRW or MRS) */
@@ -438,7 +433,7 @@ static void stm32mp1_mode_register_write(struct ddr_info *priv, uint8_t addr,
 {
 	uint32_t mrctrl0;
 
-	VERBOSE("MRS: %d = %x\n", addr, data);
+	VERBOSE("MRS: %02x = %08x\n", addr, data);
 
 	/*
 	 * 1. Poll MRSTAT.mr_wr_busy until it is '0'.
@@ -460,8 +455,7 @@ static void stm32mp1_mode_register_write(struct ddr_info *priv, uint8_t addr,
 		  (((uint32_t)addr << DDRCTRL_MRCTRL0_MR_ADDR_SHIFT) &
 		   DDRCTRL_MRCTRL0_MR_ADDR_MASK);
 	mmio_write_32((uintptr_t)&priv->ctl->mrctrl0, mrctrl0);
-	VERBOSE("[0x%lx] mrctrl0 = 0x%x (0x%x)\n",
-		(uintptr_t)&priv->ctl->mrctrl0,
+	VERBOSE("[%p] mrctrl0 = 0x%08x (0x%08x)\n", &priv->ctl->mrctrl0,
 		mmio_read_32((uintptr_t)&priv->ctl->mrctrl0), mrctrl0);
 	mmio_write_32((uintptr_t)&priv->ctl->mrctrl1, data);
 	VERBOSE("[0x%lx] mrctrl1 = 0x%x\n",

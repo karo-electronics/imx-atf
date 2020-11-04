@@ -830,7 +830,7 @@ void stpmic1_dump_regulators(void)
 	for (i = 0U; i < MAX_REGUL; i++) {
 		const char *name __unused = regulators_table[i].dt_node_name;
 
-		VERBOSE("PMIC regul %s: %sable, %dmV",
+		VERBOSE("PMIC regul %s: %sable, %dmV\n",
 			name,
 			stpmic1_is_regulator_enabled(name) ? "en" : "dis",
 			stpmic1_regulator_voltage_get(name));

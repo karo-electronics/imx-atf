@@ -9,6 +9,8 @@
 #include <common/debug.h>
 #include <lib/usb/usb_core.h>
 
+#include <stm32mp1_dbgmcu.h>
+
 /*
  * @brief  Set a STALL condition over an endpoint
  * @param  hpcd: PCD handle
@@ -39,9 +41,9 @@ static usb_status_t usb_core_set_stall(usb_handle_t *pdev, uint8_t ep_addr)
 /*
  * usb_core_get_desc
  *         Handle Get Descriptor requests
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static void usb_core_get_desc(usb_handle_t *pdev,
 			      usb_setup_req_t *req)
@@ -121,15 +123,15 @@ static void usb_core_get_desc(usb_handle_t *pdev,
 /*
  * usb_core_set_config
  *         Handle Set device configuration request
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static void usb_core_set_config(usb_handle_t *pdev, usb_setup_req_t *req)
 {
 	static uint8_t cfgidx;
 
-	cfgidx = (uint8_t)(req->value);
+	cfgidx = req->value;
 
 	if (cfgidx > USBD_MAX_NUM_CONFIGURATION) {
 		usb_core_ctl_error(pdev);
@@ -189,9 +191,9 @@ static void usb_core_set_config(usb_handle_t *pdev, usb_setup_req_t *req)
 /*
  * usb_core_get_status
  *         Handle Get Status request
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static void usb_core_get_status(usb_handle_t *pdev, usb_setup_req_t *req)
 {
@@ -218,9 +220,9 @@ static void usb_core_get_status(usb_handle_t *pdev, usb_setup_req_t *req)
 /*
  * usb_core_set_address
  *         Set device address
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static void usb_core_set_address(usb_handle_t *pdev, usb_setup_req_t *req)
 {
@@ -253,9 +255,9 @@ static void usb_core_set_address(usb_handle_t *pdev, usb_setup_req_t *req)
 /*
  * usb_core_dev_req
  *         Handle standard usb device requests
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static usb_status_t usb_core_dev_req(usb_handle_t *pdev, usb_setup_req_t *req)
 {
@@ -290,9 +292,9 @@ static usb_status_t usb_core_dev_req(usb_handle_t *pdev, usb_setup_req_t *req)
 /*
  * usb_core_itf_req
  *         Handle standard usb interface requests
- * pdev : device instance
- * req : usb request
- * return : status
+ * pdev: device instance
+ * req: usb request
+ * return: status
  */
 static usb_status_t usb_core_itf_req(usb_handle_t *pdev, usb_setup_req_t *req)
 {
@@ -328,8 +330,8 @@ static usb_status_t usb_core_itf_req(usb_handle_t *pdev, usb_setup_req_t *req)
  */
 static void usb_core_parse_req(usb_setup_req_t *req, uint8_t *pdata)
 {
-	req->bm_request = *(uint8_t *)(pdata);
-	req->b_request = *(uint8_t *)(pdata + 1);
+	req->bm_request = pdata[0];
+	req->b_request = pdata[1];
 	req->value = SWAPBYTE(pdata +  2);
 	req->index = SWAPBYTE(pdata +  4);
 	req->length = SWAPBYTE(pdata +  6);
@@ -339,9 +341,9 @@ static void usb_core_parse_req(usb_setup_req_t *req, uint8_t *pdata)
  * usb_core_setup_stage
  *         Handle the setup stage
  * pdev: device instance
- * return : status
+ * return: status
  */
-static usb_status_t usb_core_setup_stage(usb_handle_t *pdev, uint8_t *psetup)
+static usb_status_t usb_core_setup_stage(usb_handle_t *pdev, void *psetup)
 {
 	usb_core_parse_req(&pdev->request, psetup);
 
@@ -372,7 +374,7 @@ static usb_status_t usb_core_setup_stage(usb_handle_t *pdev, uint8_t *psetup)
  *         Handle data OUT stage
  * pdev: device instance
  * epnum: endpoint index
- * return : status
+ * return: status
  */
 static usb_status_t usb_core_data_out(usb_handle_t *pdev, uint8_t epnum,
 				      uint8_t *pdata)
@@ -409,7 +411,7 @@ static usb_status_t usb_core_data_out(usb_handle_t *pdev, uint8_t epnum,
  *         Handle data in stage
  * pdev: device instance
  * epnum: endpoint index
- * return : status
+ * return: status
  */
 static usb_status_t usb_core_data_in(usb_handle_t *pdev, uint8_t epnum,
 				     uint8_t *pdata)
@@ -472,8 +474,8 @@ static usb_status_t usb_core_data_in(usb_handle_t *pdev, uint8_t epnum,
 /*
  * usb_core_Suspend
  *         Handle Suspend event
- * pdev : device instance
- * return : status
+ * pdev: device instance
+ * return: status
  */
 
 static usb_status_t usb_core_suspend(usb_handle_t  *pdev)
@@ -489,8 +491,8 @@ static usb_status_t usb_core_suspend(usb_handle_t  *pdev)
 /*
  * usb_core_resume
  *         Handle Resume event
- * pdev : device instance
- * return : status
+ * pdev: device instance
+ * return: status
  */
 
 static usb_status_t usb_core_resume(usb_handle_t *pdev)
@@ -504,8 +506,8 @@ static usb_status_t usb_core_resume(usb_handle_t *pdev)
 /*
  * usb_core_sof
  *         Handle SOF event
- * pdev : device instance
- * return : status
+ * pdev: device instance
+ * return: status
  */
 
 static usb_status_t usb_core_sof(usb_handle_t *pdev)
@@ -521,8 +523,8 @@ static usb_status_t usb_core_sof(usb_handle_t *pdev)
 /*
  * usb_core_DevDisconnected
  *         Handle device disconnection event
- * pdev : device instance
- * return : status
+ * pdev: device instance
+ * return: status
  */
 static usb_status_t usb_core_disconnect(usb_handle_t *pdev)
 {
@@ -535,8 +537,8 @@ static usb_status_t usb_core_disconnect(usb_handle_t *pdev)
 
 usb_status_t usb_core_handle_it(usb_handle_t *pdev)
 {
-	uint32_t param = 0;
-	uint32_t len = 0;
+	uint32_t param;
+	uint32_t len;
 	usb_otg_ep_t *ep;
 
 	switch (pdev->driver->it_handler(pdev->data->instance, &param)) {
@@ -549,7 +551,7 @@ usb_status_t usb_core_handle_it(usb_handle_t *pdev)
 				 pdev->data->in_ep[param].xfer_buff);
 		break;
 	case USB_SETUP:
-		usb_core_setup_stage(pdev, (uint8_t *)pdev->data->setup);
+		usb_core_setup_stage(pdev, pdev->data->setup);
 		break;
 	case USB_ENUM_DONE:
 		pdev->data->init.speed = USB_OTG_SPEED_HIGH;
@@ -596,8 +598,7 @@ usb_status_t usb_core_handle_it(usb_handle_t *pdev)
 	case USB_WRITE_EMPTY:
 		pdev->driver->write_empty_tx_fifo(pdev->data->instance, param,
 				     pdev->data->in_ep[param].xfer_len,
-				     (uint32_t *)
-					&pdev->data->in_ep[param].xfer_count,
+				     &pdev->data->in_ep[param].xfer_count,
 				     pdev->data->in_ep[param].maxpacket,
 				     &pdev->data->in_ep[param].xfer_buff);
 		break;
@@ -655,7 +656,7 @@ usb_status_t usb_core_transmit(usb_handle_t *pdev, uint8_t ep_addr,
 
 	ep = &hpcd->in_ep[ep_addr & 0x7F];
 
-	/*setup and start the Xfer */
+	/* setup and start the Xfer */
 	ep->xfer_buff = buf;
 	ep->xfer_len = len;
 	ep->xfer_count = 0;
@@ -680,7 +681,7 @@ usb_status_t usb_core_transmit(usb_handle_t *pdev, uint8_t ep_addr,
 
 void usb_core_ctl_error(usb_handle_t *pdev)
 {
-	ERROR("%s : Send an ERROR\n", __func__);
+	ERROR("%s: Send an ERROR\n", __func__);
 	usb_core_set_stall(pdev, 0x80);
 	usb_core_set_stall(pdev, 0);
 }
@@ -689,7 +690,7 @@ void usb_core_ctl_error(usb_handle_t *pdev)
  * usb_core_stop
  *         Stop the USB Device Core.
  * pdev: Device Handle
- * return : USBD Status
+ * return: USBD Status
  */
 usb_status_t usb_core_stop(usb_handle_t *pdev)
 {
@@ -707,7 +708,7 @@ usb_status_t usb_core_stop(usb_handle_t *pdev)
  * usb_core_stop
  *         Stop the USB Device Core.
  * pdev: Device Handle
- * return : USBD Status
+ * return: USBD Status
  */
 usb_status_t register_usb_driver(usb_handle_t *pdev, const usb_driver_t *driver,
 				 void *driver_handle)
@@ -722,7 +723,7 @@ usb_status_t register_usb_driver(usb_handle_t *pdev, const usb_driver_t *driver,
  * usb_core_stop
  *         Stop the USB Device Core.
  * pdev: Device Handle
- * return : USBD Status
+ * return: USBD Status
  */
 usb_status_t register_platform(usb_handle_t *pdev,
 			       const usb_desc_t *plat_call_back)

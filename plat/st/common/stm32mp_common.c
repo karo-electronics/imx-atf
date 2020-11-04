@@ -37,14 +37,15 @@ void __dead2 stm32mp_plat_reset(int cpu)
 	panic();
 }
 
-static uintptr_t boot_ctx_address;
+/* Functions to save and get boot context address given by ROM code */
+static boot_api_context_t *boot_ctx_address;
 
 void stm32mp_save_boot_ctx_address(uintptr_t address)
 {
-	boot_ctx_address = address;
+	boot_ctx_address = (void *)address;
 }
 
-uintptr_t stm32mp_get_boot_ctx_address(void)
+boot_api_context_t *stm32mp_get_boot_ctx_address(void)
 {
 	return boot_ctx_address;
 }

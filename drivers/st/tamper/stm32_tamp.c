@@ -321,7 +321,7 @@ int stm32_tamp_init(void)
 	uint32_t rev __unused;
 
 	if (fdt_get_address(&fdt) == 0) {
-		return -EPERM;
+		return -EINVAL;
 	}
 
 	node = dt_get_node(&dt_tamp, -1, DT_TAMP_COMPAT);
@@ -333,7 +333,7 @@ int stm32_tamp_init(void)
 	assert(dt_tamp.clock != -1);
 
 	stm32_tamp.base = dt_tamp.base;
-	stm32_tamp.clock = (uint32_t)dt_tamp.clock;
+	stm32_tamp.clock = dt_tamp.clock;
 
 	/* Init Tamp clock */
 	stm32mp_clk_enable(stm32_tamp.clock);
@@ -355,8 +355,8 @@ int stm32_tamp_init(void)
 		rev & STM32_TAMP_VERR_MINREV);
 
 	if ((stm32_tamp.hwconf2 & STM32_TAMP_HWCFGR2_TZ) == 0U) {
-		ERROR("Tamper IP doesn't support trustzone");
-		return -EPERM;
+		ERROR("Tamper IP doesn't support trustzone\n");
+		return -ENOTSUP;
 	}
 
 	stm32_tamp_set_secured(stm32_tamp.base);

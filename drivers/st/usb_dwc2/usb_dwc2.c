@@ -28,12 +28,12 @@ static const usb_driver_t usb_dwc2driver = {
 };
 
 /*
- * USB_OTG_FlushTxFifo : Flush a Tx FIFO
- * USBx : Selected device
- * num : FIFO number
+ * USB_OTG_FlushTxFifo: Flush a Tx FIFO
+ * USBx: Selected device
+ * num: FIFO number
  *       This parameter can be a value from 1 to 15
  *       15 means Flush all Tx FIFOs
- * return : status
+ * return: status
  */
 static usb_status_t usb_dwc2_flush_tx_fifo(usb_dwc2_global_t *usbx,
 					   uint32_t num)
@@ -52,9 +52,9 @@ static usb_status_t usb_dwc2_flush_tx_fifo(usb_dwc2_global_t *usbx,
 }
 
 /*
- * USB_FlushRxFifo : Flush Rx FIFO
- * param : USBx : Selected device
- * return : status
+ * USB_FlushRxFifo: Flush Rx FIFO
+ * param: USBx: Selected device
+ * return: status
  */
 static usb_status_t usb_dwc2_flush_rx_fifo(usb_dwc2_global_t *usbx)
 {
@@ -73,59 +73,57 @@ static usb_status_t usb_dwc2_flush_rx_fifo(usb_dwc2_global_t *usbx)
 
 /*
  * USB_ReadInterrupts: return the global USB interrupt status
- * param  USBx : Selected device
- * return : interrupt register value
+ * param  USBx: Selected device
+ * return: interrupt register value
  */
 static uint32_t usb_dwc2_read_int(usb_dwc2_global_t *usbx)
 {
-	uint32_t v = 0;
+	uint32_t v;
 
-	v = usbx->gintsts;
-	v &= usbx->gintmsk;
-
+	v = usbx->gintsts & usbx->gintmsk;
 	return v;
 }
 
 /*
- * usb_dwc2_all_out_ep_int : return the USB device OUT endpoints interrupt
- * param : USBx : Selected device
- * return : device OUT endpoint interrupts
+ * usb_dwc2_all_out_ep_int: return the USB device OUT endpoints interrupt
+ * param: USBx: Selected device
+ * return: device OUT endpoint interrupts
  */
 static uint32_t usb_dwc2_all_out_ep_int(usb_dwc2_global_t *usbx)
 {
-	uint32_t v = 0;
+	uint32_t v;
 
 	v  = dwc2_handle.usb_device->daint;
 	v &= dwc2_handle.usb_device->daintmsk;
 
-	return ((v & 0xffff0000) >> 16);
+	return (v & 0xffff0000) >> 16;
 }
 
 /*
  * usb_dwc2_all_in_ep_int: return the USB device IN endpoints interrupt
- * param : USBx : Selected device
- * return : device IN endpoint interrupts
+ * param: USBx: Selected device
+ * return: device IN endpoint interrupts
  */
 static uint32_t usb_dwc2_all_in_ep_int(usb_dwc2_global_t *usbx)
 {
-	uint32_t v = 0;
+	uint32_t v;
 
 	v  = dwc2_handle.usb_device->daint;
 	v &= dwc2_handle.usb_device->daintmsk;
 
-	return ((v & 0xFFFF));
+	return v & 0xFFFF;
 }
 
 /*
- * usb_dwc2_out_ep_int : returns Device OUT EP Interrupt register
- * USBx : Selected device
- * epnum : endpoint number
+ * usb_dwc2_out_ep_int: returns Device OUT EP Interrupt register
+ * USBx: Selected device
+ * epnum: endpoint number
  *         This parameter can be a value from 0 to 15
- * return : Device OUT EP Interrupt register
+ * return: Device OUT EP Interrupt register
  */
 static uint32_t usb_dwc2_out_ep_int(usb_dwc2_global_t *usbx, uint8_t epnum)
 {
-	uint32_t v = 0;
+	uint32_t v;
 
 	v  = dwc2_handle.usb_out_endpoint[epnum]->epint;
 	v &= dwc2_handle.usb_device->doepmsk;
@@ -134,11 +132,11 @@ static uint32_t usb_dwc2_out_ep_int(usb_dwc2_global_t *usbx, uint8_t epnum)
 }
 
 /*
- * usb_dwc2_in_ep_int : Returns Device IN EP Interrupt register
- * param : USBx : Selected device
- * param : epnum : endpoint number
+ * usb_dwc2_in_ep_int: Returns Device IN EP Interrupt register
+ * param: USBx: Selected device
+ * param: epnum: endpoint number
  *         This parameter can be a value from 0 to 15
- * return : Device IN EP Interrupt register
+ * return: Device IN EP Interrupt register
  */
 static uint32_t usb_dwc2_in_ep_int(usb_dwc2_global_t *usbx, uint8_t epnum)
 {
@@ -148,26 +146,26 @@ static uint32_t usb_dwc2_in_ep_int(usb_dwc2_global_t *usbx, uint8_t epnum)
 	emp = dwc2_handle.usb_device->diepempmsk;
 	msk |= ((emp >> epnum) & 0x1) << 7;
 
-	return (dwc2_handle.usb_in_endpoint[epnum]->epint & msk);
+	return dwc2_handle.usb_in_endpoint[epnum]->epint & msk;
 }
 
 /*
- * usb_dwc2_get_mode : Returns USB core mode
- * param :  USBx : Selected device
- * return : core mode : Host or Device
+ * usb_dwc2_get_mode: Returns USB core mode
+ * param:  USBx: Selected device
+ * return: core mode: Host or Device
  *          This parameter can be one of the these values:
- *           0 : Host
- *           1 : Device
+ *           0: Host
+ *           1: Device
  */
 static uint32_t usb_dwc2_get_mode(usb_dwc2_global_t *usbx)
 {
-	return ((usbx->gintsts) & 0x1);
+	return usbx->gintsts & 0x1;
 }
 
 /*
- * usb_dwc2_activate_setup : Activate EP0 for Setup transactions
- * param : USBx : Selected device
- * return : status
+ * usb_dwc2_activate_setup: Activate EP0 for Setup transactions
+ * param: USBx: Selected device
+ * return: status
  */
 static usb_status_t usb_dwc2_activate_setup(usb_dwc2_global_t *usbx)
 {
@@ -184,10 +182,10 @@ static usb_status_t usb_dwc2_activate_setup(usb_dwc2_global_t *usbx)
 }
 
 /*
- * usb_dwc2_disable_int :
+ * usb_dwc2_disable_int:
  *         Disable the controller's Global Int in the AHB Config reg
- * param : handle : Selected device
- * return : status
+ * param: handle: Selected device
+ * return: status
  */
 usb_status_t usb_dwc2_disable_int(void *handle)
 {
@@ -198,9 +196,9 @@ usb_status_t usb_dwc2_disable_int(void *handle)
 }
 
 /*
- * usb_dwc2_ep0_out_start : Prepare the EP0 to start the first control setup
- * param : handle : Selected device
- * return : status
+ * usb_dwc2_ep0_out_start: Prepare the EP0 to start the first control setup
+ * param: handle: Selected device
+ * return: status
  */
 usb_status_t usb_dwc2_ep0_out_start(void *handle)
 {
@@ -216,10 +214,10 @@ usb_status_t usb_dwc2_ep0_out_start(void *handle)
 }
 
 /*
- * usb_dwc2_ep_start_xfer : setup and starts a transfer over an EP
- * param : handle : Selected device
- * param : ep: pointer to endpoint structure
- * return : status
+ * usb_dwc2_ep_start_xfer: setup and starts a transfer over an EP
+ * param: handle: Selected device
+ * param: ep: pointer to endpoint structure
+ * return: status
  */
 usb_status_t usb_dwc2_ep_start_xfer(void *handle, usb_otg_ep_t *ep)
 {
@@ -331,10 +329,10 @@ usb_status_t usb_dwc2_ep_start_xfer(void *handle, usb_otg_ep_t *ep)
 }
 
 /*
- * usb_dwc2_ep0_start_xfer : setup and starts a transfer over the EP  0
- * param : handle : Selected device
- * param : ep: pointer to endpoint structure
- * return : status
+ * usb_dwc2_ep0_start_xfer: setup and starts a transfer over the EP  0
+ * param: handle: Selected device
+ * param: ep: pointer to endpoint structure
+ * return: status
  */
 usb_status_t usb_dwc2_ep0_start_xfer(void *handle, usb_otg_ep_t *ep)
 {
@@ -407,13 +405,13 @@ usb_status_t usb_dwc2_ep0_start_xfer(void *handle, usb_otg_ep_t *ep)
 }
 
 /*
- * usb_dwc2_write_packet : Writes a packet into the Tx FIFO associated
+ * usb_dwc2_write_packet: Writes a packet into the Tx FIFO associated
  *         with the EP/channel
- * param : handle : Selected device
- * param : src :  pointer to source buffer
- * param : ch_ep_num : endpoint or host channel number
- * param : len : Number of bytes to write
- * return : status
+ * param: handle: Selected device
+ * param: src:  pointer to source buffer
+ * param: ch_ep_num: endpoint or host channel number
+ * param: len: Number of bytes to write
+ * return: status
  */
 usb_status_t usb_dwc2_write_packet(void *handle, uint8_t *src,
 				   uint8_t ch_ep_num, uint16_t len)
@@ -436,35 +434,35 @@ usb_status_t usb_dwc2_write_packet(void *handle, uint8_t *src,
 }
 
 /*
- * usb_dwc2_read_packet : read a packet from the Tx FIFO associated
+ * usb_dwc2_read_packet: read a packet from the Tx FIFO associated
  *         with the EP/channel
- * param : handle : Selected device
- * param : src : source pointer
- * param : ch_ep_num : endpoint or host channel number
- * param : len : Number of bytes to read
- * return : pointer to destination buffer
+ * param: handle: Selected device
+ * param: src: source pointer
+ * param: ch_ep_num: endpoint or host channel number
+ * param: len: Number of bytes to read
+ * return: pointer to destination buffer
  */
 void *usb_dwc2_read_packet(void *handle, uint8_t *dest, uint16_t len)
 {
-	uint32_t i = 0;
+	uint32_t i;
 	uint32_t count32b = (len + 3) / 4;
 	/*usb_dwc2_global_t *USBx = (usb_dwc2_global_t *)handle;*/
 
-	VERBOSE("read packet length %i to 0x%lx\n", len, (uintptr_t)dest);
+	VERBOSE("read packet length %i to %p\n", len, dest);
 
 	for (i = 0; i < count32b; i++, dest += 4) {
 		*(uint32_t *)dest = *dwc2_handle.usb_fifo[0];
 		dsb();
 	}
 
-	return ((void *)dest);
+	return dest;
 }
 
 /*
- * usb_dwc2_EPSetStall : set a stall condition over an EP
- * param : handle : Selected device
- * param : ep: pointer to endpoint structure
- * return : status
+ * usb_dwc2_EPSetStall: set a stall condition over an EP
+ * param: handle: Selected device
+ * param: ep: pointer to endpoint structure
+ * return: status
  */
 usb_status_t usb_dwc2_ep_set_stall(void *handle, usb_otg_ep_t *ep)
 {
@@ -488,13 +486,13 @@ usb_status_t usb_dwc2_ep_set_stall(void *handle, usb_otg_ep_t *ep)
 }
 
 /*
- * usb_dwc2_stop_device : Stop the usb device mode
- * param : handle : Selected device
- * return : status
+ * usb_dwc2_stop_device: Stop the usb device mode
+ * param: handle: Selected device
+ * return: status
  */
 usb_status_t usb_dwc2_stop_device(void *handle)
 {
-	uint32_t i = 0;
+	uint32_t i;
 	usb_dwc2_global_t *usbx = ((usb_dwc2_t *)handle)->usb_global;
 
 	/* Clear Pending interrupt */
@@ -517,11 +515,11 @@ usb_status_t usb_dwc2_stop_device(void *handle)
 }
 
 /*
- * usb_dwc2_set_address : Stop the usb device mode
- * param : handle : Selected device
- * param : address : new device address to be assigned
+ * usb_dwc2_set_address: Stop the usb device mode
+ * param: handle: Selected device
+ * param: address: new device address to be assigned
  *          This parameter can be a value from 0 to 255
- * return : status
+ * return: status
  */
 usb_status_t usb_dwc2_set_address(void *handle, uint8_t address)
 {
@@ -534,10 +532,10 @@ usb_status_t usb_dwc2_set_address(void *handle, uint8_t address)
 }
 
 /*
- * usb_dwc2_dev_disconnect :
+ * usb_dwc2_dev_disconnect:
  *	Disconnect the USB device by disabling the pull-up/pull-down
- * param : handle : Selected device
- * return : status
+ * param: handle: Selected device
+ * return: status
  */
 usb_status_t usb_dwc2_dev_disconnect(void *handle)
 {
@@ -551,13 +549,13 @@ usb_status_t usb_dwc2_dev_disconnect(void *handle)
 /*
  * usb_dwc2_write_empty_tx_fifo
  *         check FIFO for the next packet to be loaded
- * param : handle : Selected device
- * param : epnum : endpoint number
- * param : xfer_len : block length
- * param : xfer_count : number of block
- * param : maxpacket : max packet length
- * param : xfer_buff : buffer pointer
- * retval : status
+ * param: handle: Selected device
+ * param: epnum: endpoint number
+ * param: xfer_len: block length
+ * param: xfer_count: number of block
+ * param: maxpacket: max packet length
+ * param: xfer_buff: buffer pointer
+ * retval: status
  */
 usb_status_t usb_dwc2_write_empty_tx_fifo(void *handle,
 					  uint32_t epnum, uint32_t xfer_len,
@@ -565,35 +563,33 @@ usb_status_t usb_dwc2_write_empty_tx_fifo(void *handle,
 					  uint32_t maxpacket,
 					  uint8_t **xfer_buff)
 {
-	int32_t len = 0;
+	uint32_t len;
 	uint32_t len32b;
 	usb_dwc2_global_t *usbx = ((usb_dwc2_t *)handle)->usb_global;
 
-	len = xfer_len - *xfer_count;
-
-	if ((len > 0) && ((uint32_t)len > maxpacket))
+	len = (xfer_len >= *xfer_count) ? xfer_len - *xfer_count : 0;
+	if (len > maxpacket)
 		len = maxpacket;
 
 	len32b = (len + 3) / 4;
 
 	while ((dwc2_handle.usb_in_endpoint[epnum]->txfsts &
 		USB_OTG_DTXFSTS_INEPTFSAV) > len32b &&
-		(*xfer_count < xfer_len) && (xfer_len != 0)) {
+		*xfer_count < xfer_len) {
 		/* Write the FIFO */
-		len = xfer_len - *xfer_count;
-
-		if ((len > 0) && ((uint32_t)len > maxpacket))
-			len = maxpacket;
-
-		len32b = (len + 3) / 4;
-
 		usb_dwc2_write_packet(usbx, *xfer_buff, epnum, len);
 
 		*xfer_buff  += len;
 		*xfer_count += len;
+
+		len = xfer_len - *xfer_count;
+
+		if (len > maxpacket)
+			len = maxpacket;
+		len32b = (len + 3) / 4;
 	}
 
-	if (len <= 0) {
+	if (len == 0) {
 		uint32_t fifoemptymsk = 0x1 << epnum;
 
 		dwc2_handle.usb_device->diepempmsk &= ~fifoemptymsk;
@@ -714,7 +710,7 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 	/* Handle Resume Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_WKUINT) {
-		INFO("handle USB : Resume\n");
+		INFO("handle USB: Resume\n");
 		/* Clear the Remote Wake-up Signaling */
 		dwc2_handle.usb_device->dctl &= ~USB_OTG_DCTL_RWUSIG;
 		usbx->gintsts = USB_OTG_GINTSTS_WKUINT;
@@ -723,7 +719,7 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 	/* Handle Suspend Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_USBSUSP) {
-		INFO("handle USB : Suspend int\n");
+		INFO("handle USB: Suspend int\n");
 		usbx->gintsts = USB_OTG_GINTSTS_USBSUSP;
 		if ((dwc2_handle.usb_device->dsts & USB_OTG_DSTS_SUSPSTS) ==
 				USB_OTG_DSTS_SUSPSTS){
@@ -733,7 +729,7 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 	/* Handle LPM Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_LPMINT) {
-		INFO("handle USB : LPM int enter in suspend\n");
+		INFO("handle USB: LPM int enter in suspend\n");
 		usbx->gintsts = USB_OTG_GINTSTS_LPMINT;
 		*param = (usbx->glpmcfg & USB_OTG_GLPMCFG_BESL) >> 2;
 		return USB_LPM;
@@ -741,7 +737,7 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 	/* Handle Reset Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_USBRST) {
-		INFO("handle USB : Reset\n");
+		INFO("handle USB: Reset\n");
 		dwc2_handle.usb_device->dctl &= ~USB_OTG_DCTL_RWUSIG;
 		usb_dwc2_flush_tx_fifo(usbx, 0);
 
@@ -769,8 +765,8 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 		usb_dwc2_activate_setup(usbx);
 		usbx->gusbcfg &= ~USB_OTG_GUSBCFG_TRDT;
 
-		usbx->gusbcfg |= (uint32_t)((USBD_HS_TRDT_VALUE << 10) &
-					    USB_OTG_GUSBCFG_TRDT);
+		usbx->gusbcfg |= (USBD_HS_TRDT_VALUE << 10) &
+			USB_OTG_GUSBCFG_TRDT;
 
 		usbx->gintsts = USB_OTG_GINTSTS_ENUMDNE;
 		return USB_ENUM_DONE;
@@ -780,8 +776,8 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_RXFLVL) {
 		usbx->gintmsk &= ~USB_OTG_GINTSTS_RXFLVL;
 		temp = usbx->grxstsp;
-		*param = (temp & USB_OTG_GRXSTSP_EPNUM);
-		*param |= ((temp & USB_OTG_GRXSTSP_BCNT) << 0xC);
+		*param = temp & USB_OTG_GRXSTSP_EPNUM;
+		*param |= (temp & USB_OTG_GRXSTSP_BCNT) << 0xC;
 
 		if (((temp & USB_OTG_GRXSTSP_PKTSTS) >> 17) == STS_DATA_UPDT) {
 			if ((temp & USB_OTG_GRXSTSP_BCNT) != 0) {
@@ -798,32 +794,32 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 
 	/* Handle SOF Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_SOF) {
-		INFO("handle USB : SOF\n");
+		INFO("handle USB: SOF\n");
 		usbx->gintsts = USB_OTG_GINTSTS_SOF;
 		return USB_SOF;
 	}
 
 	/* Handle Incomplete ISO IN Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_IISOIXFR) {
-		INFO("handle USB : ISO IN\n");
+		INFO("handle USB: ISO IN\n");
 		usbx->gintsts = USB_OTG_GINTSTS_IISOIXFR;
 	}
 
 	/* Handle Incomplete ISO OUT Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_PXFR_INCOMPISOOUT) {
-		INFO("handle USB : ISO OUT\n");
+		INFO("handle USB: ISO OUT\n");
 		usbx->gintsts = USB_OTG_GINTSTS_PXFR_INCOMPISOOUT;
 	}
 
 	/* Handle Connection event Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_SRQINT) {
-		INFO("handle USB : Connect\n");
+		INFO("handle USB: Connect\n");
 		usbx->gintsts = USB_OTG_GINTSTS_SRQINT;
 	}
 
 	/* Handle Disconnection event Interrupt */
 	if (usb_dwc2_read_int(usbx) & USB_OTG_GINTSTS_OTGINT) {
-		INFO("handle USB : Disconnect\n");
+		INFO("handle USB: Disconnect\n");
 		temp = usbx->gotgint;
 		if ((temp & USB_OTG_GOTGINT_SEDET) == USB_OTG_GOTGINT_SEDET)
 			return USB_DISCONNECT;
@@ -834,26 +830,21 @@ usb_action_t usb_dwc2_it_handler(void *handle, uint32_t *param)
 void usb_dwc2_init_driver(usb_handle_t *usb_core_handle,
 			  uint32_t *base_register)
 {
-	uint32_t i = 0;
-	uintptr_t base = (uintptr_t)base_register;
+	uint32_t i;
+	void *base = base_register;
 
-	dwc2_handle.usb_global = (usb_dwc2_global_t *)base;
+	dwc2_handle.usb_global = base;
 
-	dwc2_handle.usb_device = (usb_dwc2_device_t *)
-					(base + USB_OTG_DEVICE_BASE);
+	dwc2_handle.usb_device = base + USB_OTG_DEVICE_BASE;
 
 	for (i = 0; i < USB_MAX_ENDPOINT_NB; i++) {
-		dwc2_handle.usb_in_endpoint[i] = (usb_dwc2_endpoint_t *)
-					(base + USB_OTG_IN_ENDPOINT_BASE +
-					 (i * sizeof(usb_dwc2_endpoint_t)));
-		dwc2_handle.usb_out_endpoint[i] = (usb_dwc2_endpoint_t *)
-					(base + USB_OTG_OUT_ENDPOINT_BASE +
-					(i * sizeof(usb_dwc2_endpoint_t)));
-		dwc2_handle.usb_fifo[i] = (uint32_t *)(base +
-						       USB_OTG_FIFO_BASE +
-						       (i * USB_OTG_FIFO_SIZE));
+		dwc2_handle.usb_in_endpoint[i] = base + USB_OTG_IN_ENDPOINT_BASE +
+			i * sizeof(usb_dwc2_endpoint_t);
+		dwc2_handle.usb_out_endpoint[i] = base + USB_OTG_OUT_ENDPOINT_BASE +
+			i * sizeof(usb_dwc2_endpoint_t);
+		dwc2_handle.usb_fifo[i] = base + USB_OTG_FIFO_BASE +
+			i * USB_OTG_FIFO_SIZE;
 	}
 
-	register_usb_driver(usb_core_handle, &usb_dwc2driver,
-			    (void *)&dwc2_handle);
+	register_usb_driver(usb_core_handle, &usb_dwc2driver, &dwc2_handle);
 }

@@ -9,6 +9,7 @@
 
 #include <cdefs.h>
 #include <stdbool.h>
+#include "boot_api.h"
 
 #include <platform_def.h>
 
@@ -16,7 +17,7 @@ void __dead2 stm32mp_plat_reset(int cpu);
 
 /* Functions to save and get boot context address given by ROM code */
 void stm32mp_save_boot_ctx_address(uintptr_t address);
-uintptr_t stm32mp_get_boot_ctx_address(void);
+boot_api_context_t *stm32mp_get_boot_ctx_address(void);
 
 bool stm32mp_is_single_core(void);
 bool stm32mp_is_closed_device(void);

@@ -218,7 +218,7 @@ static void unwind_stack(struct frame_record *fr, uintptr_t current_pc,
 			 uintptr_t link_register)
 {
 	uintptr_t call_site;
-	static const char *backtrace_str = "%u: %s: 0x%lx\n";
+	static const char *backtrace_str = "%u: %s: %08lx\n";
 	const char *el_str = get_el_str(get_current_el());
 
 	if (!is_valid_frame_record(fr)) {
@@ -234,7 +234,7 @@ static void unwind_stack(struct frame_record *fr, uintptr_t current_pc,
 	}
 
 	/* The level 0 of the backtrace is the current backtrace function */
-	printf(backtrace_str, 0U, el_str, current_pc);
+	//printf(backtrace_str, 0U, el_str, current_pc);
 
 	/*
 	 * The last frame record pointer in the linked list at the beginning of

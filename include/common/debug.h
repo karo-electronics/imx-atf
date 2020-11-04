@@ -99,6 +99,7 @@ void __dead2 do_panic(void);
 
 #define panic()				\
 	do {				\
+		printf("%s@%d: ", __func__, __LINE__);	\
 		backtrace(__func__);	\
 		(void)console_flush();	\
 		do_panic();		\

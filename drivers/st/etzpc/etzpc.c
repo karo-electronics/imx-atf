@@ -118,7 +118,7 @@ static int etzpc_dt_conf_decprot(int node)
 
 		id = ((value >> ETZPC_ID_SHIFT) & ETZPC_ID_MASK);
 		if (!valid_decprot_id(id)) {
-			ERROR("Invalid DECPROT %d", id);
+			ERROR("Invalid DECPROT %d\n", id);
 			return -1;
 		}
 
@@ -294,17 +294,14 @@ int etzpc_init(void)
 
 	hwcfg = mmio_read_32(etzpc_dev.base + ETZPC_HWCFGR);
 
-	etzpc_dev.num_tzma = (uint8_t)(hwcfg >> ETZPC_HWCFGR_NUM_TZMA_SHIFT);
-	etzpc_dev.num_per_sec = (uint8_t)(hwcfg >>
-					  ETZPC_HWCFGR_NUM_PER_SEC_SHIFT);
-	etzpc_dev.num_ahb_sec = (uint8_t)(hwcfg >>
-					  ETZPC_HWCFGR_NUM_AHB_SEC_SHIFT);
-	etzpc_dev.chunck_size = (uint8_t)(hwcfg >>
-					  ETZPC_HWCFGR_CHUNCKS1N4_SHIFT);
+	etzpc_dev.num_tzma = hwcfg >> ETZPC_HWCFGR_NUM_TZMA_SHIFT;
+	etzpc_dev.num_per_sec = hwcfg >> ETZPC_HWCFGR_NUM_PER_SEC_SHIFT;
+	etzpc_dev.num_ahb_sec = hwcfg >> ETZPC_HWCFGR_NUM_AHB_SEC_SHIFT;
+	etzpc_dev.chunck_size = hwcfg >> ETZPC_HWCFGR_CHUNCKS1N4_SHIFT;
 
 	etzpc_dev.revision = mmio_read_8(etzpc_dev.base + ETZPC_VERR);
 
-	VERBOSE("ETZPC version 0x%x", etzpc_dev.revision);
+	VERBOSE("ETZPC version 0x%08x\n", etzpc_dev.revision);
 
 	return etzpc_dt_conf_decprot(node);
 }

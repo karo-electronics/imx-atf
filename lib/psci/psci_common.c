@@ -769,6 +769,8 @@ void psci_warmboot_entrypoint(void)
 	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
 	psci_power_state_t state_info = { {PSCI_LOCAL_STATE_RUN} };
 
+	VERBOSE("%s@%d: \n", __func__, __LINE__);
+
 	/*
 	 * Verify that we have been explicitly turned ON or resumed from
 	 * suspend.
