@@ -1,0 +1,98 @@
+#include "stm32mp157c-security.dtsi"
+#include "stm32mp15-ddr.dtsi"
+#include <dt-bindings/clock/stm32mp1-clksrc.h>
+#include <dt-bindings/power/stm32mp1-power.h>
+
+/ {
+	aliases {
+		mmc0 = &sdmmc2;
+		serial0 = &uart4;
+		serial1 = &usart2;
+		serial2 = &usart3;
+	};
+
+	chosen {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		stdout-path = "serial0:115200n8";
+	};
+
+	sram: sram@10050000 {
+		compatible = "mmio-sram";
+		reg = <0x10050000 0x10000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0x10050000 0x10000>;
+
+		dma_pool: dma_pool@0 {
+			reg = <0x0 0x10000>;
+			pool;
+		};
+	};
+};
+
+&bsec {
+	board_id: board_id@ec {
+		reg = <0xec 0x4>;
+		st,non-secure-otp;
+	};
+};
+
+&clk_lse {
+	status = "disabled";
+};
+
+&iwdg2 {
+	timeout-sec = <32>;
+	status = "okay";
+};
+
+&nvmem_layout {
+	nvmem-cells = <&part_number_otp>,
+		      <&monotonic_otp>,
+		      <&nand_otp>,
+		      <&uid_otp>,
+		      <&package_otp>,
+		      <&hw2_otp>,
+		      <&board_id>;
+
+	nvmem-cell-names = "part_number_otp",
+			   "monotonic_otp",
+			   "nand_otp",
+			   "uid_otp",
+			   "package_otp",
+			   "hw2_otp",
+			   "board_id";
+};
+
+&rtc {
+	status = "okay";
+	secure-status = "okay";
+};
+
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4_pins_mx>;
+	status = "okay";
+};
+
+&usbotg_hs {
+	status = "okay";
+};
+
+&pinctrl {
+	uart4_pins_mx: uart4-pins-mx {
+		pins1 {
+			pinmux = <STM32_PINMUX('B', 2, AF8)>; /* UART4_RX */
+			bias-disable;
+		};
+
+		pins2 {
+			pinmux = <STM32_PINMUX('G', 11, AF6)>; /* UART4_TX */
+			bias-disable;
+			drive-push-pull;
+			slew-rate = <0>;
+		};
+	};
+};
