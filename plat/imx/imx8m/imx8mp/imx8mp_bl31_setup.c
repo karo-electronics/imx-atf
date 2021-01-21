@@ -19,6 +19,7 @@
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/mmio.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
+#include <plat_private.h>
 #include <plat/common/platform.h>
 
 #include <dram.h>
@@ -82,7 +83,6 @@ static const struct imx_csu_cfg csu_cfg[] = {
 	{0}
 };
 
-
 static entry_point_info_t bl32_image_ep_info;
 static entry_point_info_t bl33_image_ep_info;
 
@@ -107,7 +107,7 @@ static uint32_t get_spsr_for_bl33_entry(void)
 	return spsr;
 }
 
-void bl31_tzc380_setup(void)
+static void bl31_tzc380_setup(void)
 {
 	unsigned int val;
 
@@ -124,7 +124,7 @@ void bl31_tzc380_setup(void)
 
 	/* Enable 1G-5G S/NS RW */
 	tzc380_configure_region(0, 0x00000000, TZC_ATTR_REGION_SIZE(TZC_REGION_SIZE_4G) |
-		TZC_ATTR_REGION_EN_MASK | TZC_ATTR_SP_ALL);
+				TZC_ATTR_REGION_EN_MASK | TZC_ATTR_SP_ALL);
 }
 
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
@@ -149,8 +149,10 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 	imx8m_caam_init();
 
-	console_imx_uart_register(arg0, IMX_BOOT_UART_CLK_IN_HZ,
-		IMX_CONSOLE_BAUDRATE, &console);
+	imx_params_early_setup(arg1);
+	console_imx_uart_register(imx_get_uart_base(), imx_get_uart_clock(),
+				  imx_get_uart_baudrate(), &console);
+
 	/* This console is only used for boot stage */
 #if DEBUG
 	console_set_scope(&console.console,
@@ -158,7 +160,6 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 #else
 	console_set_scope(&console.console, CONSOLE_FLAG_BOOT);
 #endif
-
 	/*
 	 * tell BL3-1 where the non-secure software image is located
 	 * and the entry state information.
@@ -207,7 +208,6 @@ void bl31_plat_arch_setup(void)
 		(BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE),
 		MT_DEVICE | MT_RW | MT_SECURE);
 #endif
-
 	// Map TEE memory
 	mmap_add_region(BL32_BASE, BL32_BASE, BL32_SIZE, MT_MEMORY | MT_RW);
 
@@ -260,7 +260,6 @@ void plat_trusty_set_boot_args(aapcs64_params_t *args) {
 	args->arg2 = TRUSTY_PARAMS_LEN_BYTES;
 }
 #endif
-
 
 #if defined (CSU_RDC_TEST)
 static const struct imx_rdc_cfg rdc_for_test[] = {
