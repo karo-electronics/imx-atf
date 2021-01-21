@@ -32,7 +32,7 @@
 #define PLAT_STOP_OFF_STATE		U(3)
 
 #define BL31_BASE			U(0x960000)
-#define BL31_LIMIT			U(0x980000)
+#define BL31_LIMIT			U(0x990000)
 
 /* non-secure uboot base */
 #define PLAT_NS_IMAGE_OFFSET		U(0x40200000)
@@ -51,7 +51,12 @@
 
 #define HAB_RVT_BASE			U(0x00000900) /* HAB_RVT for i.MX8MM */
 
-#define IMX_BOOT_UART_BASE		U(0x30890000)
+#define IMX_UART1_BASE_ADDR		U(0x30860000)
+#define IMX_UART2_BASE_ADDR		U(0x30890000)
+#define IMX_UART3_BASE_ADDR		U(0x30880000)
+#define IMX_UART4_BASE_ADDR		U(0x30a60000)
+
+#define IMX_BOOT_UART_BASE		IMX_UART2_BASE_ADDR
 #define IMX_BOOT_UART_CLK_IN_HZ		24000000 /* Select 24MHz oscillator */
 
 #define PLAT_CRASH_UART_BASE		IMX_BOOT_UART_BASE
@@ -116,7 +121,7 @@
 #define SRC_GPR1_OFFSET			U(0x74)
 
 #define SRC_SCR_M4_ENABLE_MASK		BIT(3)
-#define SRC_SCR_M4C_NON_SCLR_RST_MASK  	BIT(0)
+#define SRC_SCR_M4C_NON_SCLR_RST_MASK	BIT(0)
 
 #define SNVS_LPCR			U(0x38)
 #define SNVS_LPCR_SRTC_ENV		BIT(0)
@@ -145,4 +150,9 @@
 
 #define COUNTER_FREQUENCY		8000000 /* 8MHz */
 
+#if DEBUG
+#define DEBUG_CONSOLE			1
+#else
+#define DEBUG_CONSOLE			0
+#endif
 #define IMX_WDOG_B_RESET
