@@ -9,6 +9,7 @@ PLAT_INCLUDES		:=	-Iplat/imx/common/include		\
 				-Iplat/imx/imx8m/imx8mn/include
 # Translation tables library
 include lib/xlat_tables_v2/xlat_tables.mk
+include lib/libfdt/libfdt.mk
 
 # Include GICv3 driver files
 include drivers/arm/gic/v3/gicv3.mk
@@ -40,6 +41,7 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/common/imx_sip_handler.c		\
 				plat/imx/common/imx_sip_svc.c			\
 				plat/imx/common/imx_uart_console.S		\
+				plat/imx/common/params_setup.c			\
 				lib/cpus/aarch64/cortex_a53.S			\
 				drivers/arm/tzc/tzc380.c			\
 				drivers/delay_timer/delay_timer.c		\

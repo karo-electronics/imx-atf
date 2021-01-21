@@ -17,6 +17,7 @@
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/mmio.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
+#include <plat_private.h>
 #include <plat/common/platform.h>
 
 #include <dram.h>
@@ -143,15 +144,26 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 
 	imx8m_caam_init();
 
-	console_imx_uart_register(arg0, IMX_BOOT_UART_CLK_IN_HZ,
+	console_imx_uart_register(IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ,
 		IMX_CONSOLE_BAUDRATE, &console);
-	/* This console is only used for boot stage */
+	imx_params_early_setup(arg1);
+	console_imx_uart_register(imx_get_uart_base(), imx_get_uart_clock(),
+				  imx_get_uart_baudrate(), &console);
+
 #if DEBUG
 	console_set_scope(&console.console,
 			  CONSOLE_FLAG_BOOT | CONSOLE_FLAG_RUNTIME);
 #else
+	/* This console is only used for boot stage */
 	console_set_scope(&console.console, CONSOLE_FLAG_BOOT);
 #endif
+	INFO("uart_base=%08x clock=%uMHz baudrate=%u\n",
+	     IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ / 1000000,
+	     IMX_CONSOLE_BAUDRATE);
+	INFO("%s@%d: args=%08lx %08lx %08lx %08lx\n", __func__, __LINE__,
+	     arg0, arg1, arg2, arg3);
+	INFO("ATF_LOAD_ADDR=%08x\n", BL31_BASE);
+
 	/*
 	 * tell BL3-1 where the non-secure software image is located
 	 * and the entry state information.

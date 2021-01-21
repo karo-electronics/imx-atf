@@ -132,7 +132,8 @@ bl31_entrypoint_proceed:
 	 * ---------------------------------------------------------------------
 	 */
 	mov	x20, 0
-	mov	x21, 0
+	/* keep FDT address in x21 */
+	/* mov	x21, 0 */
 	mov	x22, 0
 	mov	x23, 0
 #endif /* RESET_TO_BL31 */
