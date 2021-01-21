@@ -186,16 +186,13 @@ void __dead2 imx_system_reset(void)
 	/* WDOG_B reset */
 	val = mmio_read_16(wdog_base);
 #ifdef IMX_WDOG_B_RESET
-	val = (val & 0x001F) | WDOG_WCR_WDZST | WDOG_WCR_WDE |
-		WDOG_WCR_WDT | WDOG_WCR_SRS | BIT(8);
+	val = (val & 0x001F) | WDOG_WCR_WDE | WDOG_WCR_WDT;
 #else
-	val = (val & 0x00FF) | WDOG_WCR_WDZST | WDOG_WCR_WDE |
-		WDOG_WCR_WDA;
+	/* Assert WDOG_SRS (low) for SOFTRESET */
+	val = (val & ~WDOG_WCR_SRS) | WDOG_WCR_SRE;
 #endif
 	mmio_write_16(wdog_base, val);
 
-	mmio_write_16(wdog_base + WDOG_WSR, 0x5555);
-	mmio_write_16(wdog_base + WDOG_WSR, 0xaaaa);
 	while (1)
 		;
 }
