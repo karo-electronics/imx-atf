@@ -219,7 +219,7 @@ void dram_info_init(unsigned long dram_timing_base)
 		dcsw_op_all(DCCSW);
 		lpddr4_swffc(&dram_info, dev_fsp, 0x0);
 		dev_fsp = (~dev_fsp) & 0x1;
-	} else if (current_fsp != 0x0) {
+	} else if (dram_info.dram_type == DDRC_DDR4 && current_fsp != 0x0) {
 		/* flush the L1/L2 cache */
 		dcsw_op_all(DCCSW);
 		ddr4_swffc(&dram_info, 0x0);
@@ -307,7 +307,7 @@ int dram_dvfs_handler(uint32_t smc_fid, void *handle,
 		if (dram_info.dram_type == DDRC_LPDDR4) {
 			lpddr4_swffc(&dram_info, dev_fsp, fsp_index);
 			dev_fsp = (~dev_fsp) & 0x1;
-		} else {
+		} else if (dram_info.dram_type == DDRC_DDR4) {
 			ddr4_swffc(&dram_info, fsp_index);
 		}
 
