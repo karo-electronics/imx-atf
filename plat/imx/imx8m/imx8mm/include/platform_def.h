@@ -145,4 +145,3 @@
 
 #define COUNTER_FREQUENCY		8000000 /* 8MHz */
 
-#define IMX_WDOG_B_RESET
