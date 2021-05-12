@@ -174,7 +174,6 @@ void sp_min_plat_fiq_handler(uint32_t id)
 		tzc400_init(STM32MP1_TZC_BASE);
 		tzc400_it_handler();
 		panic();
-		break;
 	case STM32MP1_IRQ_TAMPSERRS:
 		stm32_tamp_it_handler();
 		break;
@@ -201,21 +200,20 @@ void sp_min_plat_fiq_handler(uint32_t id)
 			value = 0;
 			__asm__("mcr	p15, 1, %0, c9, c0, 3" :: "r" (value));
 		} else {
-			ERROR("IRQ_AXIERRIRQ handle call w/o any flag set!!\n");
+			ERROR("IRQ_AXIERRIRQ handler called w/o any flag set!!\n");
 		}
 
 		/* Check if FIQ has been generated due to TZC400 abort*/
 		if (tzc400_is_pending_interrupt()) {
 			tzc_it_handler();
 		} else {
-			ERROR("IRQ_AXIERRIRQ cause can't be detected");
+			ERROR("IRQ_AXIERRIRQ cause can't be detected\n");
 		}
 
 		panic();
-		break;
 	default:
-		ERROR("SECURE IT handler not define for it : %u\n", id);
-		break;
+		ERROR("SECURE IT handler not defined for it: %u\n",
+		      id & INT_ID_MASK);
 	}
 }
 
