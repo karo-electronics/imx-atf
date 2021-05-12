@@ -270,12 +270,16 @@ static int dt_get_stdout_node_offset(void)
 	if (node < 0) {
 		node = fdt_path_offset(fdt, "/chosen");
 		if (node < 0) {
-			return -FDT_ERR_NOTFOUND;
+			ERROR("%s@%d: Failed to find 'chosen' node: %d\n",
+				__func__, __LINE__, node);
+			return node;
 		}
 	}
 
 	cchar = fdt_getprop(fdt, node, "stdout-path", NULL);
 	if (cchar == NULL) {
+		ERROR("%s@%d: Failed to find 'stdout-path' property\n",
+		      __func__, __LINE__);
 		return -FDT_ERR_NOTFOUND;
 	}
 
@@ -382,7 +386,8 @@ int dt_get_stdout_uart_info(struct dt_node_info *info)
 
 	node = dt_get_stdout_node_offset();
 	if (node < 0) {
-		return -FDT_ERR_NOTFOUND;
+		ERROR("Failed to get stdout node offset: %d\n", node);
+		return node;
 	}
 
 	dt_fill_device_info(info, node);

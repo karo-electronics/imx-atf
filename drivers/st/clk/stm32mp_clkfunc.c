@@ -274,6 +274,7 @@ bool fdt_get_rcc_secure_status(void)
 
 	node = fdt_get_rcc_node();
 	if (node < 0) {
+		WARN("No rcc node found in DT: %d\n", node);
 		return false;
 	}
 
