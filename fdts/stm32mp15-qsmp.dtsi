@@ -13,7 +13,6 @@
 	aliases {
 		mmc0 = &sdmmc2;
 		mmc1 = &sdmmc1;
-		mmc2 = &sdmmc3;
 		serial0 = &uart4;
 		serial1 = &usart2;
 		serial2 = &usart3;
