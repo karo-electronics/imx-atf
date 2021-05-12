@@ -26,7 +26,6 @@ static uint32_t usbd_detach_req;
  */
 static uint8_t usb_dfu_init(usb_handle_t *pdev, uint8_t cfgidx)
 {
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Nothing to do in this stage */
 	return USBD_OK;
 }
@@ -40,7 +39,6 @@ static uint8_t usb_dfu_init(usb_handle_t *pdev, uint8_t cfgidx)
  */
 static uint8_t usb_dfu_de_init(usb_handle_t *pdev, uint8_t cfgidx)
 {
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Nothing to do in this stage */
 	return USBD_OK;
 }
@@ -57,7 +55,6 @@ static uint8_t  usb_dfu_data_in(usb_handle_t *pdev, uint8_t epnum)
 	(void)pdev;
 	(void)epnum;
 
-	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -72,7 +69,6 @@ static void usb_dfu_leave(usb_handle_t *pdev)
 {
 	usb_dfu_handle_t *hdfu = pdev->class_data;
 
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	hdfu->manif_state = DFU_MANIFEST_COMPLETE;
 
 	if (DFU_BM_ATTRIBUTE & 0x04) {
@@ -105,7 +101,6 @@ static uint8_t usb_dfu_ep0_rx_ready(usb_handle_t *pdev)
 {
 	(void)pdev;
 
-	VERBOSE("%s@%d: pdev=%p\n", __func__, __LINE__, pdev);
 	return USBD_OK;
 }
 
@@ -121,7 +116,6 @@ static uint8_t usb_dfu_ep0_tx_ready(usb_handle_t *pdev)
 	uint16_t len, dfu_version;
 	uint8_t *serial = pdev->desc->get_dfu_desc(&len);
 
-	VERBOSE("%s@%d: pdev=%p\n", __func__, __LINE__, pdev);
 	dfu_version = serial[len - 1] << 8 | serial[len - 2];
 
 	if (hdfu->dev_state == DFU_STATE_DNLOAD_BUSY) {
@@ -198,7 +192,6 @@ static uint8_t usb_dfu_sof(usb_handle_t *pdev)
 {
 	(void)pdev;
 
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	return USBD_OK;
 }
 
@@ -213,7 +206,6 @@ static uint8_t usb_dfu_iso_in_incomplete(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
-	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -228,7 +220,6 @@ static uint8_t usb_dfu_iso_out_incomplete(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
-	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -243,7 +234,6 @@ static uint8_t usb_dfu_data_out(usb_handle_t *pdev, uint8_t epnum)
 {
 	(void)pdev;
 	(void)epnum;
-	VERBOSE("%s@%d: pdev=%p ep=%u\n", __func__, __LINE__, pdev, epnum);
 	return USBD_OK;
 }
 
@@ -291,7 +281,6 @@ static void usb_dfu_download(usb_handle_t *pdev, usb_setup_req_t *req)
 {
 	usb_dfu_handle_t *hdfu = pdev->class_data;
 
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Data setup request */
 	if (req->length > 0) {
 		if ((hdfu->dev_state == DFU_STATE_IDLE) ||
@@ -356,7 +345,6 @@ static void usb_dfu_upload(usb_handle_t *pdev, usb_setup_req_t *req)
 {
 	usb_dfu_handle_t *hdfu = pdev->class_data;
 
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	/* Data setup request */
 	if (req->length > 0) {
 		if ((hdfu->dev_state == DFU_STATE_IDLE) ||
@@ -464,7 +452,6 @@ static void usb_dfu_get_status(usb_handle_t *pdev)
 	uint8_t dfu_bm_attribute = DFU_BM_ATTRIBUTE;
 	usb_dfu_media_t *p = pdev->user_data;
 
-	VERBOSE("%s@%d: \n", __func__, __LINE__);
 	switch (hdfu->dev_state) {
 	case DFU_STATE_DNLOAD_SYNC:
 		status = p->get_status();
