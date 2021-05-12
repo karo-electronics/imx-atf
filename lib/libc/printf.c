@@ -25,7 +25,10 @@ static int string_print(const char *str)
 {
 	int count = 0;
 
-	assert(str != NULL);
+	if (str == NULL) {
+		string_print("<NULL>");
+		return 0;
+	}
 
 	for ( ; *str != '\0'; str++) {
 		(void)putchar(*str);
