@@ -319,20 +319,25 @@ uint32_t bsec_find_otp_name_in_dt(const char *name, uint32_t *otp,
 
 	node = dt_get_node_by_compatible(DT_NVMEM_LAYOUT_COMPAT);
 	if (node < 0) {
+		ERROR("%s not found in DT: %d\n", DT_NVMEM_LAYOUT_COMPAT,
+		      node);
 		return BSEC_ERROR;
 	}
 
 	index = fdt_stringlist_search(fdt, node, "nvmem-cell-names", name);
 	if (index < 0) {
+		ERROR("%s not found in nvmem-cell-names: %d\n", name, index);
 		return BSEC_ERROR;
 	}
 
 	cuint = fdt_getprop(fdt, node, "nvmem-cells", &len);
 	if (cuint == NULL) {
+		ERROR("'nvmem-cells' property not found in %s\n", name);
 		return BSEC_ERROR;
 	}
 
 	if ((index * (int)sizeof(uint32_t)) > len) {
+		ERROR("nvmem-cell index %d out of range\n", index);
 		return BSEC_ERROR;
 	}
 
