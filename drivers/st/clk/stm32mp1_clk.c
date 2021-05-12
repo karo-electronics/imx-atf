@@ -128,13 +128,12 @@ enum stm32mp1_parent_sel {
 
 /* State the parent clock ID straight related to a clock */
 static const uint8_t parent_id_clock_id[_PARENT_NB] = {
-	[_HSE] = CK_HSE,
 	[_HSI] = CK_HSI,
+	[_HSE] = CK_HSE,
 	[_CSI] = CK_CSI,
-	[_LSE] = CK_LSE,
 	[_LSI] = CK_LSI,
+	[_LSE] = CK_LSE,
 	[_I2S_CKIN] = _UNKNOWN_ID,
-	[_USB_PHY_48] = _UNKNOWN_ID,
 	[_HSI_KER] = CK_HSI,
 	[_HSE_KER] = CK_HSE,
 	[_HSE_KER_DIV2] = CK_HSE_DIV2,
@@ -157,9 +156,12 @@ static const uint8_t parent_id_clock_id[_PARENT_NB] = {
 	[_PCLK3] = CK_AXI,
 	[_PCLK4] = CK_AXI,
 	[_PCLK5] = CK_AXI,
+	[_HCLK6] = _UNKNOWN_ID,
+	[_HCLK2] = _UNKNOWN_ID,
 	[_CK_PER] = CK_PER,
 	[_CK_MPU] = CK_MPU,
 	[_CK_MCU] = CK_MCU,
+	[_USB_PHY_48] = _UNKNOWN_ID,
 };
 
 static unsigned int clock_id2parent_id(unsigned long id)
@@ -187,7 +189,7 @@ enum stm32mp1_div_id {
 	_DIV_P,
 	_DIV_Q,
 	_DIV_R,
-	_DIV_NB,
+	_DIV_NB
 };
 
 enum stm32mp1_clksrc_id {
@@ -657,7 +659,7 @@ static const char * const stm32mp1_clk_parent_name[_PARENT_NB] __unused = {
 	[_PCLK3] = "PCLK3",
 	[_PCLK4] = "PCLK4",
 	[_PCLK5] = "PCLK5",
-	[_HCLK6] = "KCLK6",
+	[_HCLK6] = "HCLK6",
 	[_HCLK2] = "HCLK2",
 	[_CK_PER] = "CK_PER",
 	[_CK_MPU] = "CK_MPU",
@@ -686,6 +688,9 @@ const stm32mp1_clk_parent_sel_name[_PARENT_SEL_NB] __unused = {
 	[_MCUS_SEL] = "MCUSS",
 	[_USBPHY_SEL] = "USBPHY",
 	[_USBO_SEL] = "USBO",
+	[_RTC_SEL] = "RTC",
+	[_MPU_SEL] = "MPU",
+	[_PER_SEL] = "PER",
 };
 #endif
 
@@ -784,6 +789,238 @@ static unsigned int get_id_from_rcc_bit(unsigned int offset, unsigned int bit)
 	return ~0U;
 }
 
+static const char * const stm32mp1_clk_names[] = {
+	[CK_HSE] = "ck_hse",
+	[CK_CSI] = "ck_csi",
+	[CK_LSI] = "ck_lsi",
+	[CK_LSE] = "ck_lse",
+	[CK_HSI] = "ck_hsi",
+	[CK_HSE_DIV2] = "ck_hse_div2",
+	[TIM2] = "tim2",
+	[TIM3] = "tim3",
+	[TIM4] = "tim4",
+	[TIM5] = "tim5",
+	[TIM6] = "tim6",
+	[TIM7] = "tim7",
+	[TIM12] = "tim12",
+	[TIM13] = "tim13",
+	[TIM14] = "tim14",
+	[LPTIM1] = "lptim1",
+	[SPI2] = "spi2",
+	[SPI3] = "spi3",
+	[USART2] = "usart2",
+	[USART3] = "usart3",
+	[UART4] = "uart4",
+	[UART5] = "uart5",
+	[UART7] = "uart7",
+	[UART8] = "uart8",
+	[I2C1] = "i2c1",
+	[I2C2] = "i2c2",
+	[I2C3] = "i2c3",
+	[I2C5] = "i2c5",
+	[SPDIF] = "spdif",
+	[CEC] = "cec",
+	[DAC12] = "dac12",
+	[MDIO] = "mdio",
+	[TIM1] = "tim1",
+	[TIM8] = "tim8",
+	[TIM15] = "tim15",
+	[TIM16] = "tim16",
+	[TIM17] = "tim17",
+	[SPI1] = "spi1",
+	[SPI4] = "spi4",
+	[SPI5] = "spi5",
+	[USART6] = "usart6",
+	[SAI1] = "sai1",
+	[SAI2] = "sai2",
+	[SAI3] = "sai3",
+	[DFSDM] = "dfsdm",
+	[FDCAN] = "fdcan",
+	[LPTIM2] = "lptim2",
+	[LPTIM3] = "lptim3",
+	[LPTIM4] = "lptim4",
+	[LPTIM5] = "lptim5",
+	[SAI4] = "sai4",
+	[SYSCFG] = "syscfg",
+	[VREF] = "vref",
+	[TMPSENS] = "tmpsens",
+	[PMBCTRL] = "pmbctrl",
+	[HDP] = "hdp",
+	[LTDC] = "ltdc",
+	[DSI] = "dsi",
+	[IWDG2] = "iwdg2",
+	[USBPHY] = "usbphy",
+	[STGENRO] = "stgenro",
+	[SPI6] = "spi6",
+	[I2C4] = "i2c4",
+	[I2C6] = "i2c6",
+	[USART1] = "usart1",
+	[RTCAPB] = "rtcapb",
+	[TZC1] = "tzc1",
+	[TZPC] = "tzpc",
+	[IWDG1] = "iwdg1",
+	[BSEC] = "bsec",
+	[STGEN] = "stgen",
+	[DMA1] = "dma1",
+	[DMA2] = "dma2",
+	[DMAMUX] = "dmamux",
+	[ADC12] = "adc12",
+	[USBO] = "usbo",
+	[SDMMC3] = "sdmmc3",
+	[DCMI] = "dcmi",
+	[CRYP2] = "cryp2",
+	[HASH2] = "hash2",
+	[RNG2] = "rng2",
+	[CRC2] = "crc2",
+	[HSEM] = "hsem",
+	[IPCC] = "ipcc",
+	[GPIOA] = "gpioa",
+	[GPIOB] = "gpiob",
+	[GPIOC] = "gpioc",
+	[GPIOD] = "gpiod",
+	[GPIOE] = "gpioe",
+	[GPIOF] = "gpiof",
+	[GPIOG] = "gpiog",
+	[GPIOH] = "gpioh",
+	[GPIOI] = "gpioi",
+	[GPIOJ] = "gpioj",
+	[GPIOK] = "gpiok",
+	[GPIOZ] = "gpioz",
+	[CRYP1] = "cryp1",
+	[HASH1] = "hash1",
+	[RNG1] = "rng1",
+	[BKPSRAM] = "bkpsram",
+	[MDMA] = "mdma",
+	[GPU] = "gpu",
+	[ETHCK] = "ethck",
+	[ETHTX] = "ethtx",
+	[ETHRX] = "ethrx",
+	[ETHMAC] = "ethmac",
+	[FMC] = "fmc",
+	[QSPI] = "qspi",
+	[SDMMC1] = "sdmmc1",
+	[SDMMC2] = "sdmmc2",
+	[CRC1] = "crc1",
+	[USBH] = "usbh",
+	[ETHSTP] = "ethstp",
+	[TZC2] = "tzc2",
+	[SDMMC1_K] = "sdmmc1_k",
+	[SDMMC2_K] = "sdmmc2_k",
+	[SDMMC3_K] = "sdmmc3_k",
+	[FMC_K] = "fmc_k",
+	[QSPI_K] = "qspi_k",
+	[ETHCK_K] = "ethck_k",
+	[RNG1_K] = "rng1_k",
+	[RNG2_K] = "rng2_k",
+	[GPU_K] = "gpu_k",
+	[USBPHY_K] = "usbphy_k",
+	[STGEN_K] = "stgen_k",
+	[SPDIF_K] = "spdif_k",
+	[SPI1_K] = "spi1_k",
+	[SPI2_K] = "spi2_k",
+	[SPI3_K] = "spi3_k",
+	[SPI4_K] = "spi4_k",
+	[SPI5_K] = "spi5_k",
+	[SPI6_K] = "spi6_k",
+	[CEC_K] = "cec_k",
+	[I2C1_K] = "i2c1_k",
+	[I2C2_K] = "i2c2_k",
+	[I2C3_K] = "i2c3_k",
+	[I2C4_K] = "i2c4_k",
+	[I2C5_K] = "i2c5_k",
+	[I2C6_K] = "i2c6_k",
+	[LPTIM1_K] = "lptim1_k",
+	[LPTIM2_K] = "lptim2_k",
+	[LPTIM3_K] = "lptim3_k",
+	[LPTIM4_K] = "lptim4_k",
+	[LPTIM5_K] = "lptim5_k",
+	[USART1_K] = "usart1_k",
+	[USART2_K] = "usart2_k",
+	[USART3_K] = "usart3_k",
+	[UART4_K] = "uart4_k",
+	[UART5_K] = "uart5_k",
+	[USART6_K] = "usart6_k",
+	[UART7_K] = "uart7_k",
+	[UART8_K] = "uart8_k",
+	[DFSDM_K] = "dfsdm_k",
+	[FDCAN_K] = "fdcan_k",
+	[SAI1_K] = "sai1_k",
+	[SAI2_K] = "sai2_k",
+	[SAI3_K] = "sai3_k",
+	[SAI4_K] = "sai4_k",
+	[ADC12_K] = "adc12_k",
+	[DSI_K] = "dsi_k",
+	[DSI_PX] = "dsi_px",
+	[ADFSDM_K] = "adfsdm_k",
+	[USBO_K] = "usbo_k",
+	[LTDC_PX] = "ltdc_px",
+	[DAC12_K] = "dac12_k",
+	[ETHPTP_K] = "ethptp_k",
+	[PCLK1] = "pclk1",
+	[PCLK2] = "pclk2",
+	[PCLK3] = "pclk3",
+	[PCLK4] = "pclk4",
+	[PCLK5] = "pclk5",
+	[PLL1] = "pll1",
+	[PLL2] = "pll2",
+	[PLL3] = "pll3",
+	[PLL4] = "pll4",
+	[PLL1_P] = "pll1_p",
+	[PLL1_Q] = "pll1_q",
+	[PLL1_R] = "pll1_r",
+	[PLL2_P] = "pll2_p",
+	[PLL2_Q] = "pll2_q",
+	[PLL2_R] = "pll2_r",
+	[PLL3_P] = "pll3_p",
+	[PLL3_Q] = "pll3_q",
+	[PLL3_R] = "pll3_r",
+	[PLL4_P] = "pll4_p",
+	[PLL4_Q] = "pll4_q",
+	[PLL4_R] = "pll4_r",
+	[RTC] = "rtc",
+	[CK_PER] = "ck_per",
+	[CK_MPU] = "ck_mpu",
+	[CK_AXI] = "ck_axi",
+	[CK_MCU] = "ck_mcu",
+	[TIM2_K] = "tim2_k",
+	[TIM3_K] = "tim3_k",
+	[TIM4_K] = "tim4_k",
+	[TIM5_K] = "tim5_k",
+	[TIM6_K] = "tim6_k",
+	[TIM7_K] = "tim7_k",
+	[TIM12_K] = "tim12_k",
+	[TIM13_K] = "tim13_k",
+	[TIM14_K] = "tim14_k",
+	[TIM1_K] = "tim1_k",
+	[TIM8_K] = "tim8_k",
+	[TIM15_K] = "tim15_k",
+	[TIM16_K] = "tim16_k",
+	[TIM17_K] = "tim17_k",
+	[CK_MCO1] = "ck_mco1",
+	[CK_MCO2] = "ck_mco2",
+	[CK_DBG] = "ck_dbg",
+	[CK_TRACE] = "ck_trace",
+	[DDRC1] = "ddrc1",
+	[DDRC1LP] = "ddrc1lp",
+	[DDRC2] = "ddrc2",
+	[DDRC2LP] = "ddrc2lp",
+	[DDRPHYC] = "ddrphyc",
+	[DDRPHYCLP] = "ddrphyclp",
+	[DDRCAPB] = "ddrcapb",
+	[DDRCAPBLP] = "ddrcapblp",
+	[AXIDCG] = "axidcg",
+	[DDRPHYCAPB] = "ddrphycapb",
+	[DDRPHYCAPBLP] = "ddrphycapblp",
+	[DDRPERFM] = "ddrperfm",
+};
+
+static inline const char *clk_get_name(unsigned long id)
+{
+	if (id < ARRAY_SIZE(stm32mp1_clk_names))
+		return stm32mp1_clk_names[id];
+	return "<NO_NAME>";
+}
+
 static unsigned long stm32mp1_clk_get_fixed(enum stm32mp_osc_id idx)
 {
 	if (idx >= NB_OSC) {
@@ -844,7 +1081,7 @@ static int stm32mp1_clk_get_parent(unsigned long id)
 
 	s = stm32mp1_clk_get_sel(i);
 	if (s == _UNKNOWN_SEL) {
-		return -EINVAL;
+		return -ENOENT;
 	}
 	if (s >= _PARENT_SEL_NB) {
 		panic();
@@ -855,10 +1092,14 @@ static int stm32mp1_clk_get_parent(unsigned long id)
 		 (sel->msk << sel->src)) >> sel->src;
 	if (p_sel < sel->nb_parent) {
 #if LOG_LEVEL >= LOG_LEVEL_VERBOSE
-		VERBOSE("%s: %s clock is the parent %s of clk id %ld\n",
-			__func__,
-			stm32mp1_clk_parent_name[sel->parent[p_sel]],
-			stm32mp1_clk_parent_sel_name[s], id);
+		if (stm32mp1_clk_parent_sel_name[s])
+			VERBOSE("%s: %s clock is the parent %s of clk id %ld\n",
+				__func__,
+				stm32mp1_clk_parent_name[sel->parent[p_sel]],
+				stm32mp1_clk_parent_sel_name[s], id);
+		else
+			ERROR("%s: clock %u is missing in stm32mp1_clk_parent_sel_name[]\n",
+			      __func__, s);
 #endif
 		return (int)sel->parent[p_sel];
 	}
@@ -1827,19 +2068,23 @@ static void stm32mp1_mco_csg(uint32_t clksrc, uint32_t clkdiv)
 static void stm32mp1_set_rtcsrc(unsigned int clksrc, bool lse_css)
 {
 	uintptr_t address = stm32mp_rcc_base() + RCC_BDCR;
+	uint32_t bdcr = mmio_read_32(address);
 
-	if (((mmio_read_32(address) & RCC_BDCR_RTCCKEN) == 0U) ||
-	    (clksrc != (uint32_t)CLK_RTC_DISABLED)) {
-		mmio_clrsetbits_32(address,
-				   RCC_BDCR_RTCSRC_MASK,
-				   clksrc << RCC_BDCR_RTCSRC_SHIFT);
+	if (clksrc != (uint32_t)CLK_RTC_DISABLED)
+		bdcr |= RCC_BDCR_RTCCKEN;
+	else
+		bdcr &= ~RCC_BDCR_RTCCKEN;
 
-		mmio_setbits_32(address, RCC_BDCR_RTCCKEN);
+	clksrc &= RCC_SELR_SRC_MASK;
+	if (clksrc << RCC_BDCR_RTCSRC_SHIFT !=
+	    (bdcr & RCC_BDCR_RTCSRC_MASK)) {
+		mmio_write_32(address, RCC_BDCR_VSWRST);
+		bdcr &= ~(RCC_BDCR_RTCSRC_MASK | RCC_BDCR_LSECSSON);
+		bdcr |= clksrc << RCC_BDCR_RTCSRC_SHIFT;
 	}
-
-	if (lse_css) {
-		mmio_setbits_32(address, RCC_BDCR_LSECSSON);
-	}
+	mmio_write_32(address, bdcr);
+	if (lse_css)
+		mmio_write_32(address, bdcr | RCC_BDCR_LSECSSON);
 }
 
 unsigned long stm32mp_clk_timer_get_rate(unsigned long id)
@@ -2462,6 +2707,9 @@ int stm32mp1_clk_compute_all_pll1_settings(uint32_t buck1_voltage)
 void stm32mp1_clk_lp_save_opp_pll1_settings(uint8_t *data, size_t size)
 {
 	if (size != sizeof(pll1_settings) || !clk_pll1_settings_are_valid()) {
+		if (size != sizeof(pll1_settings))
+			ERROR("Invalid save area size: %zu instead of %zu\n",
+			      size, sizeof(pll1_settings));
 		panic();
 	}
 
@@ -3402,10 +3650,17 @@ void stm32mp1_dump_clocks_state(void)
 		unsigned int __unused refcnt = gate_refcounts[idx];
 		int __unused p = stm32mp1_clk_get_parent(clock_id);
 
-		VERBOSE("stm32mp1 clk %lu %sabled (refcnt %d) (parent %d %s)\n",
-			clock_id, __clk_is_enabled(gate) ? "en" : "dis",
-			refcnt, p,
-			p < 0 ? "n.a" : stm32mp1_clk_parent_sel_name[p]);
+		if (p == -ENOENT)
+			VERBOSE("stm32mp1 clk %lu (%s) %sabled (refcnt %d)\n",
+				clock_id, clk_get_name(clock_id),
+				__clk_is_enabled(gate) ? "en" : "dis",
+				refcnt);
+		else
+			VERBOSE("stm32mp1 clk %lu (%s) %sabled (refcnt %d) (parent %d %s)\n",
+				clock_id, clk_get_name(clock_id),
+				__clk_is_enabled(gate) ? "en" : "dis",
+				refcnt, p,
+				p < 0 ? "n.a" : (stm32mp1_clk_parent_name[p] ?: "<NULL>"));
 	}
 #endif
 }
