@@ -19,19 +19,19 @@ VERSION_MINOR			:= 2
 MAKEOVERRIDES =
 
 MAKE_HELPERS_DIRECTORY := make_helpers/
-include ${MAKE_HELPERS_DIRECTORY}build_macros.mk
-include ${MAKE_HELPERS_DIRECTORY}build_env.mk
+include $(MAKE_HELPERS_DIRECTORY)build_macros.mk
+include $(MAKE_HELPERS_DIRECTORY)build_env.mk
 
 ################################################################################
 # Default values for build configurations, and their dependencies
 ################################################################################
 
-include ${MAKE_HELPERS_DIRECTORY}defaults.mk
+include $(MAKE_HELPERS_DIRECTORY)defaults.mk
 
 # Assertions enabled for DEBUG builds by default
-ENABLE_ASSERTIONS		:= ${DEBUG}
-ENABLE_PMF			:= ${ENABLE_RUNTIME_INSTRUMENTATION}
-PLAT				:= ${DEFAULT_PLAT}
+ENABLE_ASSERTIONS		:= $(DEBUG)
+ENABLE_PMF			:= $(ENABLE_RUNTIME_INSTRUMENTATION)
+PLAT				:= $(DEFAULT_PLAT)
 
 ################################################################################
 # Checkpatch script options
@@ -57,10 +57,10 @@ ROOT_DIRS_TO_CHECK	:=	$(sort $(filter-out			\
 					docs				\
 					%.rst,				\
 					$(wildcard *)))
-CHECK_PATHS		:=	${ROOT_DIRS_TO_CHECK}			\
-				${INC_DIRS_TO_CHECK}			\
-				${INC_LIB_DIRS_TO_CHECK}		\
-				${LIB_DIRS_TO_CHECK}
+CHECK_PATHS		:=	$(ROOT_DIRS_TO_CHECK)			\
+				$(INC_DIRS_TO_CHECK)			\
+				$(INC_LIB_DIRS_TO_CHECK)		\
+				$(LIB_DIRS_TO_CHECK)
 
 
 ################################################################################
@@ -68,7 +68,7 @@ CHECK_PATHS		:=	${ROOT_DIRS_TO_CHECK}			\
 ################################################################################
 
 # Verbose flag
-ifeq (${V},0)
+ifeq ($(V),0)
         Q:=@
         ECHO:=@echo
         CHECKCODE_ARGS	+=	--no-summary --terse
@@ -86,7 +86,7 @@ export Q ECHO
 
 # Process Debug flag
 $(eval $(call add_define,DEBUG))
-ifneq (${DEBUG}, 0)
+ifneq ($(DEBUG), 0)
         BUILD_TYPE	:=	debug
         TF_CFLAGS	+= 	-g
 
@@ -105,45 +105,45 @@ else
 endif
 
 # Default build string (git branch and commit)
-ifeq (${BUILD_STRING},)
+ifeq ($(BUILD_STRING),)
         BUILD_STRING	:=	$(shell git describe --always --dirty --tags 2> /dev/null)
 endif
-VERSION_STRING		:=	v${VERSION_MAJOR}.${VERSION_MINOR}(${BUILD_TYPE}):${BUILD_STRING}
+VERSION_STRING		:=	v$(VERSION_MAJOR).$(VERSION_MINOR)($(BUILD_TYPE)):$(BUILD_STRING)
 
 # The cert_create tool cannot generate certificates individually, so we use the
 # target 'certificates' to create them all
-ifneq (${GENERATE_COT},0)
+ifneq ($(GENERATE_COT),0)
         FIP_DEPS += certificates
         FWU_FIP_DEPS += fwu_certificates
 endif
 
 # Process BRANCH_PROTECTION value and set
 # Pointer Authentication and Branch Target Identification flags
-ifeq (${BRANCH_PROTECTION},0)
+ifeq ($(BRANCH_PROTECTION),0)
 	# Default value turns off all types of branch protection
 	BP_OPTION := none
-else ifneq (${ARCH},aarch64)
+else ifneq ($(ARCH),aarch64)
         $(error BRANCH_PROTECTION requires AArch64)
-else ifeq (${BRANCH_PROTECTION},1)
+else ifeq ($(BRANCH_PROTECTION),1)
 	# Enables all types of branch protection features
 	BP_OPTION := standard
 	ENABLE_BTI := 1
 	ENABLE_PAUTH := 1
-else ifeq (${BRANCH_PROTECTION},2)
+else ifeq ($(BRANCH_PROTECTION),2)
 	# Return address signing to its standard level
 	BP_OPTION := pac-ret
 	ENABLE_PAUTH := 1
-else ifeq (${BRANCH_PROTECTION},3)
+else ifeq ($(BRANCH_PROTECTION),3)
 	# Extend the signing to include leaf functions
 	BP_OPTION := pac-ret+leaf
 	ENABLE_PAUTH := 1
 else
-        $(error Unknown BRANCH_PROTECTION value ${BRANCH_PROTECTION})
+        $(error Unknown BRANCH_PROTECTION value $(BRANCH_PROTECTION))
 endif
 
 # USE_SPINLOCK_CAS requires AArch64 build
-ifeq (${USE_SPINLOCK_CAS},1)
-ifneq (${ARCH},aarch64)
+ifeq ($(USE_SPINLOCK_CAS),1)
+ifneq ($(ARCH),aarch64)
         $(error USE_SPINLOCK_CAS requires AArch64)
 else
         $(info USE_SPINLOCK_CAS is an experimental feature)
@@ -157,36 +157,36 @@ endif
 HOSTCC			:=	gcc
 export HOSTCC
 
-CC			:=	${CROSS_COMPILE}gcc
-CPP			:=	${CROSS_COMPILE}cpp
-AS			:=	${CROSS_COMPILE}gcc
-AR			:=	${CROSS_COMPILE}ar
-LINKER			:=	${CROSS_COMPILE}ld
-OC			:=	${CROSS_COMPILE}objcopy
-OD			:=	${CROSS_COMPILE}objdump
-NM			:=	${CROSS_COMPILE}nm
-PP			:=	${CROSS_COMPILE}gcc -E
+CC			:=	$(CROSS_COMPILE)gcc
+CPP			:=	$(CROSS_COMPILE)cpp
+AS			:=	$(CROSS_COMPILE)gcc
+AR			:=	$(CROSS_COMPILE)ar
+LINKER			:=	$(CROSS_COMPILE)ld
+OC			:=	$(CROSS_COMPILE)objcopy
+OD			:=	$(CROSS_COMPILE)objdump
+NM			:=	$(CROSS_COMPILE)nm
+PP			:=	$(CROSS_COMPILE)gcc -E
 DTC			:=	dtc
 
-# Use ${LD}.bfd instead if it exists (as absolute path or together with $PATH).
-ifneq ($(strip $(wildcard ${LD}.bfd) \
-	$(foreach dir,$(subst :, ,${PATH}),$(wildcard ${dir}/${LINKER}.bfd))),)
-LINKER			:=	${LINKER}.bfd
+# Use $(LD).bfd instead if it exists (as absolute path or together with $PATH).
+ifneq ($(strip $(wildcard $(LD).bfd) \
+	$(foreach dir,$(subst :, ,${PATH}),$(wildcard $(dir)/$(LINKER).bfd))),)
+LINKER			:=	$(LINKER).bfd
 endif
 
-ifeq (${ARM_ARCH_MAJOR},7)
+ifeq ($(ARM_ARCH_MAJOR),7)
 target32-directive	= 	-target arm-none-eabi
 # Will set march32-directive from platform configuration
 else
 target32-directive	= 	-target armv8a-none-eabi
 
 # Set the compiler's target architecture profile based on ARM_ARCH_MINOR option
-ifeq (${ARM_ARCH_MINOR},0)
+ifeq ($(ARM_ARCH_MINOR),0)
 march32-directive	= 	-march=armv8-a
 march64-directive	= 	-march=armv8-a
 else
-march32-directive	= 	-march=armv8.${ARM_ARCH_MINOR}-a
-march64-directive	= 	-march=armv8.${ARM_ARCH_MINOR}-a
+march32-directive	= 	-march=armv8.$(ARM_ARCH_MINOR)-a
+march64-directive	= 	-march=armv8.$(ARM_ARCH_MINOR)-a
 endif
 endif
 
@@ -210,19 +210,19 @@ TF_CFLAGS_aarch64	=	$(march64-directive)
 LD			=	$(LINKER)
 endif
 
-ifeq (${AARCH32_INSTRUCTION_SET},A32)
+ifeq ($(AARCH32_INSTRUCTION_SET),A32)
 TF_CFLAGS_aarch32	+=	-marm
-else ifeq (${AARCH32_INSTRUCTION_SET},T32)
+else ifeq ($(AARCH32_INSTRUCTION_SET),T32)
 TF_CFLAGS_aarch32	+=	-mthumb
 else
-$(error Error: Unknown AArch32 instruction set ${AARCH32_INSTRUCTION_SET})
+$(error Error: Unknown AArch32 instruction set $(AARCH32_INSTRUCTION_SET))
 endif
 
 TF_CFLAGS_aarch32	+=	-mno-unaligned-access
 TF_CFLAGS_aarch64	+=	-mgeneral-regs-only -mstrict-align
 
-ifneq (${BP_OPTION},none)
-TF_CFLAGS_aarch64	+=	-mbranch-protection=${BP_OPTION}
+ifneq ($(BP_OPTION),none)
+TF_CFLAGS_aarch64	+=	-mbranch-protection=$(BP_OPTION)
 endif
 
 ASFLAGS_aarch32		=	$(march32-directive)
@@ -252,11 +252,11 @@ WARNING3 += -Wpointer-arith
 WARNING3 += -Wredundant-decls
 WARNING3 += -Wswitch-default
 
-ifeq (${W},1)
+ifeq ($(W),1)
 WARNINGS := $(WARNING1)
-else ifeq (${W},2)
+else ifeq ($(W),2)
 WARNINGS := $(WARNING1) $(WARNING2)
-else ifeq (${W},3)
+else ifeq ($(W),3)
 WARNINGS := $(WARNING1) $(WARNING2) $(WARNING3)
 endif
 
@@ -275,11 +275,11 @@ else
 WARNINGS	+=		-Wshift-overflow -Wshift-sign-overflow
 endif
 
-ifneq (${E},0)
+ifneq ($(E),0)
 ERRORS := -Werror
 endif
 
-CPPFLAGS		=	${DEFINES} ${INCLUDES} ${MBEDTLS_INC} -nostdinc		\
+CPPFLAGS		=	$(DEFINES) $(INCLUDES) $(MBEDTLS_INC) -nostdinc		\
 				-Wmissing-include-dirs $(ERRORS) $(WARNINGS)
 ASFLAGS			+=	$(CPPFLAGS) $(ASFLAGS_$(ARCH))			\
 				-ffreestanding -Wa,--fatal-warnings
@@ -287,10 +287,10 @@ TF_CFLAGS		+=	$(CPPFLAGS) $(TF_CFLAGS_$(ARCH))		\
 				-ffreestanding -fno-builtin -Wall -std=gnu99	\
 				-Os -ffunction-sections -fdata-sections
 
-ifeq (${SANITIZE_UB},on)
+ifeq ($(SANITIZE_UB),on)
 TF_CFLAGS		+=	-fsanitize=undefined -fno-sanitize-recover
 endif
-ifeq (${SANITIZE_UB},trap)
+ifeq ($(SANITIZE_UB),trap)
 TF_CFLAGS		+=	-fsanitize=undefined -fno-sanitize-recover	\
 				-fsanitize-undefined-trap-on-error
 endif
@@ -316,30 +316,30 @@ include lib/compiler-rt/compiler-rt.mk
 
 BL_COMMON_SOURCES	+=	common/bl_common.c			\
 				common/tf_log.c				\
-				common/${ARCH}/debug.S			\
+				common/$(ARCH)/debug.S			\
 				drivers/console/multi_console.c		\
-				lib/${ARCH}/cache_helpers.S		\
-				lib/${ARCH}/misc_helpers.S		\
+				lib/$(ARCH)/cache_helpers.S		\
+				lib/$(ARCH)/misc_helpers.S		\
 				plat/common/plat_bl_common.c		\
 				plat/common/plat_log_common.c		\
-				plat/common/${ARCH}/plat_common.c	\
-				plat/common/${ARCH}/platform_helpers.S	\
-				${COMPILER_RT_SRCS}
+				plat/common/$(ARCH)/plat_common.c	\
+				plat/common/$(ARCH)/platform_helpers.S	\
+				$(COMPILER_RT_SRCS)
 
 ifeq ($(notdir $(CC)),armclang)
-BL_COMMON_SOURCES	+=	lib/${ARCH}/armclang_printf.S
+BL_COMMON_SOURCES	+=	lib/$(ARCH)/armclang_printf.S
 endif
 
-ifeq (${SANITIZE_UB},on)
+ifeq ($(SANITIZE_UB),on)
 BL_COMMON_SOURCES	+=	plat/common/ubsan.c
 endif
 
 INCLUDES		+=	-Iinclude				\
-				-Iinclude/arch/${ARCH}			\
-				-Iinclude/lib/cpus/${ARCH}		\
-				-Iinclude/lib/el3_runtime/${ARCH}	\
-				${PLAT_INCLUDES}			\
-				${SPD_INCLUDES}
+				-Iinclude/arch/$(ARCH)			\
+				-Iinclude/lib/cpus/$(ARCH)		\
+				-Iinclude/lib/el3_runtime/$(ARCH)	\
+				$(PLAT_INCLUDES)			\
+				$(SPD_INCLUDES)
 
 include common/backtrace/backtrace.mk
 
@@ -347,10 +347,10 @@ include common/backtrace/backtrace.mk
 # Generic definitions
 ################################################################################
 
-include ${MAKE_HELPERS_DIRECTORY}plat_helpers.mk
+include $(MAKE_HELPERS_DIRECTORY)plat_helpers.mk
 
 BUILD_BASE		:=	./build
-BUILD_PLAT		:=	${BUILD_BASE}/${PLAT}/${BUILD_TYPE}
+BUILD_PLAT		:=	$(BUILD_BASE)/$(PLAT)/$(BUILD_TYPE)
 
 SPDS			:=	$(sort $(filter-out none, $(patsubst services/spd/%,%,$(wildcard services/spd/*))))
 
@@ -362,8 +362,8 @@ INCLUDE_TBBR_MK		:=	1
 # Include SPD Makefile if one has been specified
 ################################################################################
 
-ifneq (${SPD},none)
-ifeq (${ARCH},aarch32)
+ifneq ($(SPD),none)
+ifeq ($(ARCH),aarch32)
         $(error "Error: SPD is incompatible with AArch32.")
 endif
 ifdef EL3_PAYLOAD_BASE
@@ -371,13 +371,13 @@ ifdef EL3_PAYLOAD_BASE
         $(warning "The SPD and its BL32 companion will be present but ignored.")
 endif
         # We expect to locate an spd.mk under the specified SPD directory
-        SPD_MAKE	:=	$(wildcard services/spd/${SPD}/${SPD}.mk)
+        SPD_MAKE	:=	$(wildcard services/spd/$(SPD)/$(SPD).mk)
 
-        ifeq (${SPD_MAKE},)
-                $(error Error: No services/spd/${SPD}/${SPD}.mk located)
+        ifeq ($(SPD_MAKE),)
+                $(error Error: No services/spd/$(SPD)/$(SPD).mk located)
         endif
-        $(info Including ${SPD_MAKE})
-        include ${SPD_MAKE}
+        $(info Including $(SPD_MAKE))
+        include $(SPD_MAKE)
 
         # If there's BL32 companion for the chosen SPD, we expect that the SPD's
         # Makefile would set NEED_BL32 to "yes". In this case, the build system
@@ -395,11 +395,11 @@ endif
 # makefile may use all previous definitions in this file)
 ################################################################################
 
-include ${PLAT_MAKEFILE_FULL}
+include $(PLAT_MAKEFILE_FULL)
 
-$(eval $(call MAKE_PREREQ_DIR,${BUILD_PLAT}))
+$(eval $(call MAKE_PREREQ_DIR,$(BUILD_PLAT)))
 
-ifeq (${ARM_ARCH_MAJOR},7)
+ifeq ($(ARM_ARCH_MAJOR),7)
 include make_helpers/armv7-a-cpus.mk
 endif
 
@@ -407,7 +407,7 @@ ifeq ($(ENABLE_PIE),1)
     TF_CFLAGS		+=	-fpie
     TF_LDFLAGS		+=	-pie --no-dynamic-linker
 else
-    PIE_FOUND		:=	$(findstring --enable-default-pie,${GCC_V_OUTPUT})
+    PIE_FOUND		:=	$(findstring --enable-default-pie,$(GCC_V_OUTPUT))
     ifneq ($(PIE_FOUND),)
         TF_CFLAGS		+=	-fno-PIE
     endif
@@ -418,22 +418,22 @@ endif
 # This can be overridden by the platform.
 include lib/cpus/cpu-ops.mk
 
-ifeq (${ARCH},aarch32)
+ifeq ($(ARCH),aarch32)
 NEED_BL32 := yes
 
 ################################################################################
 # Build `AARCH32_SP` as BL32 image for AArch32
 ################################################################################
-ifneq (${AARCH32_SP},none)
+ifneq ($(AARCH32_SP),none)
 # We expect to locate an sp.mk under the specified AARCH32_SP directory
-AARCH32_SP_MAKE	:=	$(wildcard bl32/${AARCH32_SP}/${AARCH32_SP}.mk)
+AARCH32_SP_MAKE	:=	$(wildcard bl32/$(AARCH32_SP)/$(AARCH32_SP).mk)
 
-ifeq (${AARCH32_SP_MAKE},)
-  $(error Error: No bl32/${AARCH32_SP}/${AARCH32_SP}.mk located)
+ifeq ($(AARCH32_SP_MAKE),)
+  $(error Error: No bl32/$(AARCH32_SP)/$(AARCH32_SP).mk located)
 endif
 
-$(info Including ${AARCH32_SP_MAKE})
-include ${AARCH32_SP_MAKE}
+$(info Including $(AARCH32_SP_MAKE))
+include $(AARCH32_SP_MAKE)
 endif
 
 endif
@@ -441,7 +441,7 @@ endif
 ################################################################################
 # Include libc if not overridden
 ################################################################################
-ifeq (${OVERRIDE_LIBC},0)
+ifeq ($(OVERRIDE_LIBC),0)
 include lib/libc/libc.mk
 endif
 
@@ -454,15 +454,15 @@ ifdef EL3_PAYLOAD_BASE
                 $(warning "PRELOADED_BL33_BASE and EL3_PAYLOAD_BASE are \
                 incompatible build options. EL3_PAYLOAD_BASE has priority.")
         endif
-        ifneq (${GENERATE_COT},0)
+        ifneq ($(GENERATE_COT),0)
                 $(error "GENERATE_COT and EL3_PAYLOAD_BASE are incompatible build options.")
         endif
-        ifneq (${TRUSTED_BOARD_BOOT},0)
+        ifneq ($(TRUSTED_BOARD_BOOT),0)
                 $(error "TRUSTED_BOARD_BOOT and EL3_PAYLOAD_BASE are incompatible build options.")
         endif
 endif
 
-ifeq (${NEED_BL33},yes)
+ifeq ($(NEED_BL33),yes)
         ifdef EL3_PAYLOAD_BASE
                 $(warning "BL33 image is not needed when option \
                 BL33_PAYLOAD_BASE is used and won't be added to the FIP file.")
@@ -501,7 +501,7 @@ endif
 
 # DYN_DISABLE_AUTH can be set only when TRUSTED_BOARD_BOOT=1
 ifeq ($(DYN_DISABLE_AUTH), 1)
-    ifeq (${TRUSTED_BOARD_BOOT}, 0)
+    ifeq ($(TRUSTED_BOARD_BOOT), 0)
         $(error "TRUSTED_BOARD_BOOT must be enabled for DYN_DISABLE_AUTH to be set.")
     endif
 endif
@@ -516,7 +516,7 @@ ifeq ($(ENABLE_PAUTH),1)
 endif
 
 ifeq ($(CTX_INCLUDE_PAUTH_REGS),1)
-    ifneq (${ARCH},aarch64)
+    ifneq ($(ARCH),aarch64)
         $(error CTX_INCLUDE_PAUTH_REGS requires AArch64)
     else
         $(info CTX_INCLUDE_PAUTH_REGS is an experimental feature)
@@ -532,7 +532,7 @@ ifeq ($(ENABLE_BTI),1)
 endif
 
 ifeq ($(CTX_INCLUDE_MTE_REGS),1)
-    ifneq (${ARCH},aarch64)
+    ifneq ($(ARCH),aarch64)
         $(error CTX_INCLUDE_MTE_REGS requires AArch64)
     else
         $(info CTX_INCLUDE_MTE_REGS is an experimental feature)
@@ -567,7 +567,7 @@ ifdef SCP_BL2
 endif
 
 # For AArch32, BL31 is not currently supported.
-ifneq (${ARCH},aarch32)
+ifneq ($(ARCH),aarch32)
     ifdef BL31_SOURCES
         # When booting an EL3 payload, there is no need to compile the BL31 image nor
         # put it in the FIP.
@@ -578,24 +578,24 @@ ifneq (${ARCH},aarch32)
 endif
 
 # Process TBB related flags
-ifneq (${GENERATE_COT},0)
+ifneq ($(GENERATE_COT),0)
         # Common cert_create options
-        ifneq (${CREATE_KEYS},0)
+        ifneq ($(CREATE_KEYS),0)
                 $(eval CRT_ARGS += -n)
                 $(eval FWU_CRT_ARGS += -n)
-                ifneq (${SAVE_KEYS},0)
+                ifneq ($(SAVE_KEYS),0)
                         $(eval CRT_ARGS += -k)
                         $(eval FWU_CRT_ARGS += -k)
                 endif
         endif
         # Include TBBR makefile (unless the platform indicates otherwise)
-        ifeq (${INCLUDE_TBBR_MK},1)
+        ifeq ($(INCLUDE_TBBR_MK),1)
                 include make_helpers/tbbr/tbbr_tools.mk
         endif
 endif
 
-ifneq (${FIP_ALIGN},0)
-FIP_ARGS += --align ${FIP_ALIGN}
+ifneq ($(FIP_ALIGN),0)
+FIP_ARGS += --align $(FIP_ALIGN)
 endif
 
 ################################################################################
@@ -610,15 +610,15 @@ include lib/stack_protector/stack_protector.mk
 
 # Variables for use with Certificate Generation Tool
 CRTTOOLPATH		?=	tools/cert_create
-CRTTOOL			?=	${CRTTOOLPATH}/cert_create${BIN_EXT}
+CRTTOOL			?=	$(CRTTOOLPATH)/cert_create$(BIN_EXT)
 
 # Variables for use with Firmware Image Package
 FIPTOOLPATH		?=	tools/fiptool
-FIPTOOL			?=	${FIPTOOLPATH}/fiptool${BIN_EXT}
+FIPTOOL			?=	$(FIPTOOLPATH)/fiptool$(BIN_EXT)
 
 # Variables for use with sptool
 SPTOOLPATH		?=	tools/sptool
-SPTOOL			?=	${SPTOOLPATH}/sptool${BIN_EXT}
+SPTOOL			?=	$(SPTOOLPATH)/sptool$(BIN_EXT)
 
 # Variables for use with ROMLIB
 ROMLIBPATH		?=	lib/romlib
@@ -641,7 +641,7 @@ NEED_BL2U := yes
 include bl2u/bl2u.mk
 endif
 
-ifeq (${NEED_BL31},yes)
+ifeq ($(NEED_BL31),yes)
 ifdef BL31_SOURCES
 include bl31/bl31.mk
 endif
@@ -748,14 +748,14 @@ $(eval $(call add_define,HW_ASSISTED_COHERENCY))
 $(eval $(call add_define,LOG_LEVEL))
 $(eval $(call add_define,NS_TIMER_SWITCH))
 $(eval $(call add_define,PL011_GENERIC_UART))
-$(eval $(call add_define,PLAT_${PLAT}))
+$(eval $(call add_define,PLAT_$(PLAT)))
 $(eval $(call add_define,PROGRAMMABLE_RESET_ADDRESS))
 $(eval $(call add_define,PSCI_EXTENDED_STATE_ID))
 $(eval $(call add_define,RAS_EXTENSION))
 $(eval $(call add_define,RESET_TO_BL31))
 $(eval $(call add_define,SEPARATE_CODE_AND_RODATA))
 $(eval $(call add_define,RECLAIM_INIT_CODE))
-$(eval $(call add_define,SPD_${SPD}))
+$(eval $(call add_define,SPD_$(SPD)))
 $(eval $(call add_define,SPIN_ON_BL1_EXIT))
 $(eval $(call add_define,SPM_MM))
 $(eval $(call add_define,TRUSTED_BOARD_BOOT))
@@ -769,7 +769,7 @@ $(eval $(call add_define,BL2_INV_DCACHE))
 $(eval $(call add_define,USE_SPINLOCK_CAS))
 $(eval $(call add_define,AARCH32_EXCEPTION_DEBUG))
 
-ifeq (${SANITIZE_UB},trap)
+ifeq ($(SANITIZE_UB),trap)
         $(eval $(call add_define,MONITOR_TRAPS))
 endif
 
@@ -785,7 +785,7 @@ else
 endif
 
 # Define the DYN_DISABLE_AUTH flag only if set.
-ifeq (${DYN_DISABLE_AUTH},1)
+ifeq ($(DYN_DISABLE_AUTH),1)
 $(eval $(call add_define,DYN_DISABLE_AUTH))
 endif
 
@@ -803,9 +803,9 @@ endif
 all: msg_start
 
 msg_start:
-	@echo "Building ${PLAT}"
+	@echo "Building $(PLAT)"
 
-ifeq (${ERROR_DEPRECATED},0)
+ifeq ($(ERROR_DEPRECATED),0)
 # Check if deprecated declarations and cpp warnings should be treated as error or not.
 ifneq ($(findstring clang,$(notdir $(CC))),)
     CPPFLAGS		+= 	-Wno-error=deprecated-declarations
@@ -815,7 +815,7 @@ endif
 # __ASSEMBLY__ is deprecated in favor of the compiler-builtin __ASSEMBLER__.
 ASFLAGS	+= -D__ASSEMBLY__
 # AARCH32/AARCH64 macros are deprecated in favor of the compiler-builtin __aarch64__.
-ifeq (${ARCH},aarch32)
+ifeq ($(ARCH),aarch32)
         $(eval $(call add_define,AARCH32))
 else
         $(eval $(call add_define,AARCH64))
@@ -826,52 +826,52 @@ $(eval $(call MAKE_LIB_DIRS))
 $(eval $(call MAKE_LIB,c))
 
 # Expand build macros for the different images
-ifeq (${NEED_BL1},yes)
+ifeq ($(NEED_BL1),yes)
 $(eval $(call MAKE_BL,1))
 endif
 
-ifeq (${NEED_BL2},yes)
-ifeq (${BL2_AT_EL3}, 0)
+ifeq ($(NEED_BL2),yes)
+ifeq ($(BL2_AT_EL3), 0)
 FIP_BL2_ARGS := tb-fw
 endif
 
-$(if ${BL2}, $(eval $(call TOOL_ADD_IMG,bl2,--${FIP_BL2_ARGS})),\
-	$(eval $(call MAKE_BL,2,${FIP_BL2_ARGS})))
+$(if $(BL2), $(eval $(call TOOL_ADD_IMG,bl2,--$(FIP_BL2_ARGS))),\
+	$(eval $(call MAKE_BL,2,$(FIP_BL2_ARGS))))
 endif
 
-ifeq (${NEED_SCP_BL2},yes)
+ifeq ($(NEED_SCP_BL2),yes)
 $(eval $(call TOOL_ADD_IMG,scp_bl2,--scp-fw))
 endif
 
-ifeq (${NEED_BL31},yes)
-BL31_SOURCES += ${SPD_SOURCES}
-$(if ${BL31}, $(eval $(call TOOL_ADD_IMG,bl31,--soc-fw)),\
+ifeq ($(NEED_BL31),yes)
+BL31_SOURCES += $(SPD_SOURCES)
+$(if $(BL31), $(eval $(call TOOL_ADD_IMG,bl31,--soc-fw)),\
 	$(eval $(call MAKE_BL,31,soc-fw)))
 endif
 
 # If a BL32 image is needed but neither BL32 nor BL32_SOURCES is defined, the
 # build system will call TOOL_ADD_IMG to print a warning message and abort the
 # process. Note that the dependency on BL32 applies to the FIP only.
-ifeq (${NEED_BL32},yes)
+ifeq ($(NEED_BL32),yes)
 
 BUILD_BL32 := $(if $(BL32),,$(if $(BL32_SOURCES),1))
 
-$(if ${BUILD_BL32}, $(eval $(call MAKE_BL,32,tos-fw)),\
+$(if $(BUILD_BL32), $(eval $(call MAKE_BL,32,tos-fw)),\
 	$(eval $(call TOOL_ADD_IMG,bl32,--tos-fw)))
 endif
 
 # Add the BL33 image if required by the platform
-ifeq (${NEED_BL33},yes)
+ifeq ($(NEED_BL33),yes)
 $(eval $(call TOOL_ADD_IMG,bl33,--nt-fw))
 endif
 
-ifeq (${NEED_BL2U},yes)
-$(if ${BL2U}, $(eval $(call TOOL_ADD_IMG,bl2u,--ap-fwu-cfg,FWU_)),\
+ifeq ($(NEED_BL2U),yes)
+$(if $(BL2U), $(eval $(call TOOL_ADD_IMG,bl2u,--ap-fwu-cfg,FWU_)),\
 	$(eval $(call MAKE_BL,2u,ap-fwu-cfg,FWU_)))
 endif
 
 # Expand build macros for the different images
-ifeq (${NEED_FDT},yes)
+ifeq ($(NEED_FDT),yes)
     $(eval $(call MAKE_DTBS,$(BUILD_PLAT)/fdts,$(FDT_SOURCES)))
 endif
 
@@ -879,33 +879,33 @@ locate-checkpatch:
 ifndef CHECKPATCH
 	$(error "Please set CHECKPATCH to point to the Linux checkpatch.pl file, eg: CHECKPATCH=../linux/scripts/checkpatch.pl")
 else
-ifeq (,$(wildcard ${CHECKPATCH}))
+ifeq (,$(wildcard $(CHECKPATCH)))
 	$(error "The file CHECKPATCH points to cannot be found, use eg: CHECKPATCH=../linux/scripts/checkpatch.pl")
 endif
 endif
 
 clean:
 	@echo "  CLEAN"
-	$(call SHELL_REMOVE_DIR,${BUILD_PLAT})
-	${Q}${MAKE} --no-print-directory -C ${FIPTOOLPATH} clean
-	${Q}${MAKE} PLAT=${PLAT} --no-print-directory -C ${CRTTOOLPATH} clean
-	${Q}${MAKE} --no-print-directory -C ${ROMLIBPATH} clean
+	$(call SHELL_REMOVE_DIR,$(BUILD_PLAT))
+	$(Q)$(MAKE) --no-print-directory -C $(FIPTOOLPATH) clean
+	$(Q)$(MAKE) PLAT=$(PLAT) --no-print-directory -C $(CRTTOOLPATH) clean
+	$(Q)$(MAKE) --no-print-directory -C $(ROMLIBPATH) clean
 
 realclean distclean:
 	@echo "  REALCLEAN"
-	$(call SHELL_REMOVE_DIR,${BUILD_BASE})
-	$(call SHELL_DELETE_ALL, ${CURDIR}/cscope.*)
-	${Q}${MAKE} --no-print-directory -C ${FIPTOOLPATH} clean
-	${Q}${MAKE} --no-print-directory -C ${SPTOOLPATH} clean
-	${Q}${MAKE} PLAT=${PLAT} --no-print-directory -C ${CRTTOOLPATH} clean
-	${Q}${MAKE} --no-print-directory -C ${ROMLIBPATH} clean
+	$(call SHELL_REMOVE_DIR,$(BUILD_BASE))
+	$(call SHELL_DELETE_ALL, $(CURDIR)/cscope.*)
+	$(Q)$(MAKE) --no-print-directory -C $(FIPTOOLPATH) clean
+	$(Q)$(MAKE) --no-print-directory -C $(SPTOOLPATH) clean
+	$(Q)$(MAKE) PLAT=$(PLAT) --no-print-directory -C $(CRTTOOLPATH) clean
+	$(Q)$(MAKE) --no-print-directory -C $(ROMLIBPATH) clean
 
 checkcodebase:		locate-checkpatch
 	@echo "  CHECKING STYLE"
 	@if test -d .git ; then						\
 		git ls-files | grep -E -v 'libfdt|libc|docs|\.rst' |	\
 		while read GIT_FILE ;					\
-		do ${CHECKPATCH} ${CHECKCODE_ARGS} -f $$GIT_FILE ;	\
+		do $(CHECKPATCH) $(CHECKCODE_ARGS) -f $$GIT_FILE ;	\
 		done ;							\
 	else								\
 		 find . -type f -not -iwholename "*.git*"		\
@@ -914,95 +914,95 @@ checkcodebase:		locate-checkpatch
 		 -not -iwholename "*libc*"				\
 		 -not -iwholename "*docs*"				\
 		 -not -iwholename "*.rst"				\
-		 -exec ${CHECKPATCH} ${CHECKCODE_ARGS} -f {} \; ;	\
+		 -exec $(CHECKPATCH) $(CHECKCODE_ARGS) -f {} \; ;	\
 	fi
 
 checkpatch:		locate-checkpatch
 	@echo "  CHECKING STYLE"
-	@if test -n "${CHECKPATCH_OPTS}"; then				\
-		echo "    with ${CHECKPATCH_OPTS} option(s)";		\
+	@if test -n "$(CHECKPATCH_OPTS)"; then				\
+		echo "    with $(CHECKPATCH_OPTS) option(s)";		\
 	fi
-	${Q}COMMON_COMMIT=$$(git merge-base HEAD ${BASE_COMMIT});	\
+	$(Q)COMMON_COMMIT=$$(git merge-base HEAD $(BASE_COMMIT));	\
 	for commit in `git rev-list $$COMMON_COMMIT..HEAD`; do		\
 		printf "\n[*] Checking style of '$$commit'\n\n";	\
 		git log --format=email "$$commit~..$$commit"		\
-			-- ${CHECK_PATHS} |				\
-			${CHECKPATCH} ${CHECKPATCH_OPTS} - || true;	\
+			-- $(CHECK_PATHS) |				\
+			$(CHECKPATCH) $(CHECKPATCH_OPTS) - || true;	\
 		git diff --format=email "$$commit~..$$commit"		\
-			-- ${CHECK_PATHS} |				\
-			${CHECKPATCH}  ${CHECKPATCH_OPTS} - || true;	\
+			-- $(CHECK_PATHS) |				\
+			$(CHECKPATCH)  $(CHECKPATCH_OPTS) - || true;	\
 	done
 
-certtool: ${CRTTOOL}
+certtool: $(CRTTOOL)
 
-.PHONY: ${CRTTOOL}
-${CRTTOOL}:
-	${Q}${MAKE} PLAT=${PLAT} USE_TBBR_DEFS=${USE_TBBR_DEFS} --no-print-directory -C ${CRTTOOLPATH}
-	@${ECHO_BLANK_LINE}
+.PHONY: $(CRTTOOL)
+$(CRTTOOL):
+	$(Q)$(MAKE) PLAT=$(PLAT) USE_TBBR_DEFS=$(USE_TBBR_DEFS) --no-print-directory -C $(CRTTOOLPATH)
+	@$(ECHO_BLANK_LINE)
 	@echo "Built $@ successfully"
-	@${ECHO_BLANK_LINE}
+	@$(ECHO_BLANK_LINE)
 
-ifneq (${GENERATE_COT},0)
-certificates: ${CRT_DEPS} ${CRTTOOL}
-	${Q}${CRTTOOL} ${CRT_ARGS}
-	@${ECHO_BLANK_LINE}
+ifneq ($(GENERATE_COT),0)
+certificates: $(CRT_DEPS) $(CRTTOOL)
+	$(Q)$(CRTTOOL) $(CRT_ARGS)
+	@$(ECHO_BLANK_LINE)
 	@echo "Built $@ successfully"
-	@echo "Certificates can be found in ${BUILD_PLAT}"
-	@${ECHO_BLANK_LINE}
+	@echo "Certificates can be found in $(BUILD_PLAT)"
+	@$(ECHO_BLANK_LINE)
 endif
 
-${BUILD_PLAT}/${FIP_NAME}: ${FIP_DEPS} ${FIPTOOL}
-	${Q}${FIPTOOL} create ${FIP_ARGS} $@
-	${Q}${FIPTOOL} info $@
-	@${ECHO_BLANK_LINE}
+$(BUILD_PLAT)/$(FIP_NAME): $(FIP_DEPS) $(FIPTOOL)
+	$(Q)$(FIPTOOL) create $(FIP_ARGS) $@
+	$(Q)$(FIPTOOL) info $@
+	@$(ECHO_BLANK_LINE)
 	@echo "Built $@ successfully"
-	@${ECHO_BLANK_LINE}
+	@$(ECHO_BLANK_LINE)
 
-ifneq (${GENERATE_COT},0)
-fwu_certificates: ${FWU_CRT_DEPS} ${CRTTOOL}
-	${Q}${CRTTOOL} ${FWU_CRT_ARGS}
-	@${ECHO_BLANK_LINE}
+ifneq ($(GENERATE_COT),0)
+fwu_certificates: $(FWU_CRT_DEPS) $(CRTTOOL)
+	$(Q)$(CRTTOOL) $(FWU_CRT_ARGS)
+	@$(ECHO_BLANK_LINE)
 	@echo "Built $@ successfully"
-	@echo "FWU certificates can be found in ${BUILD_PLAT}"
-	@${ECHO_BLANK_LINE}
+	@echo "FWU certificates can be found in $(BUILD_PLAT)"
+	@$(ECHO_BLANK_LINE)
 endif
 
-${BUILD_PLAT}/${FWU_FIP_NAME}: ${FWU_FIP_DEPS} ${FIPTOOL}
-	${Q}${FIPTOOL} create ${FWU_FIP_ARGS} $@
-	${Q}${FIPTOOL} info $@
-	@${ECHO_BLANK_LINE}
+$(BUILD_PLAT)/$(FWU_FIP_NAME): $(FWU_FIP_DEPS) $(FIPTOOL)
+	$(Q)$(FIPTOOL) create $(FWU_FIP_ARGS) $@
+	$(Q)$(FIPTOOL) info $@
+	@$(ECHO_BLANK_LINE)
 	@echo "Built $@ successfully"
-	@${ECHO_BLANK_LINE}
+	@$(ECHO_BLANK_LINE)
 
-fiptool: ${FIPTOOL}
-fip: ${BUILD_PLAT}/${FIP_NAME}
-fwu_fip: ${BUILD_PLAT}/${FWU_FIP_NAME}
+fiptool: $(FIPTOOL)
+fip: $(BUILD_PLAT)/$(FIP_NAME)
+fwu_fip: $(BUILD_PLAT)/$(FWU_FIP_NAME)
 
-.PHONY: ${FIPTOOL}
-${FIPTOOL}:
-	${Q}${MAKE} CPPFLAGS="-DVERSION='\"${VERSION_STRING}\"'" --no-print-directory -C ${FIPTOOLPATH}
+.PHONY: $(FIPTOOL)
+$(FIPTOOL):
+	$(Q)$(MAKE) CPPFLAGS="-DVERSION='\"$(VERSION_STRING)\"'" --no-print-directory -C $(FIPTOOLPATH)
 
-sptool: ${SPTOOL}
-.PHONY: ${SPTOOL}
-${SPTOOL}:
-	${Q}${MAKE} CPPFLAGS="-DVERSION='\"${VERSION_STRING}\"'" --no-print-directory -C ${SPTOOLPATH}
+sptool: $(SPTOOL)
+.PHONY: $(SPTOOL)
+$(SPTOOL):
+	$(Q)$(MAKE) CPPFLAGS="-DVERSION='\"$(VERSION_STRING)\"'" --no-print-directory -C $(SPTOOLPATH)
 
 .PHONY: libraries
 romlib.bin: libraries
-	${Q}${MAKE} PLAT_DIR=${PLAT_DIR} BUILD_PLAT=${BUILD_PLAT} ENABLE_BTI=${ENABLE_BTI} ARM_ARCH_MINOR=${ARM_ARCH_MINOR} INCLUDES='${INCLUDES}' DEFINES='${DEFINES}' --no-print-directory -C ${ROMLIBPATH} all
+	$(Q)$(MAKE) PLAT_DIR=$(PLAT_DIR) BUILD_PLAT=$(BUILD_PLAT) ENABLE_BTI=$(ENABLE_BTI) ARM_ARCH_MINOR=$(ARM_ARCH_MINOR) INCLUDES='$(INCLUDES)' DEFINES='$(DEFINES)' --no-print-directory -C $(ROMLIBPATH) all
 
 cscope:
 	@echo "  CSCOPE"
-	${Q}find ${CURDIR} -name "*.[chsS]" > cscope.files
-	${Q}cscope -b -q -k
+	$(Q)find $(CURDIR) -name "*.[chsS]" > cscope.files
+	$(Q)cscope -b -q -k
 
 help:
-	@echo "usage: ${MAKE} [PLAT=<platform>] [OPTIONS] [TARGET]"
+	@echo "usage: $(MAKE) [PLAT=<platform>] [OPTIONS] [TARGET]"
 	@echo ""
 	@echo "PLAT is used to specify which platform you wish to build."
-	@echo "If no platform is specified, PLAT defaults to: ${DEFAULT_PLAT}"
+	@echo "If no platform is specified, PLAT defaults to: $(DEFAULT_PLAT)"
 	@echo ""
-	@echo "platform = ${PLATFORM_LIST}"
+	@echo "platform = $(PLATFORM_LIST)"
 	@echo ""
 	@echo "Please refer to the User Guide for a list of all supported options."
 	@echo "Note that the build system doesn't track dependencies for build "
