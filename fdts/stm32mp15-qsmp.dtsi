@@ -11,47 +11,8 @@
 
 / {
 	aliases {
-		mmc0 = &sdmmc2;
 		mmc1 = &sdmmc1;
-		serial0 = &uart4;
-		serial1 = &usart2;
-		serial2 = &usart3;
 	};
-
-	chosen {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-		stdout-path = "serial0:115200n8";
-	};
-
-	sram: sram@10050000 {
-		compatible = "mmio-sram";
-		reg = <0x10050000 0x10000>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0 0x10050000 0x10000>;
-
-		dma_pool: dma_pool@0 {
-			reg = <0x0 0x10000>;
-			pool;
-		};
-	};
-
-	usb_phy_tuning: usb-phy-tuning {
-		st,hs-dc-level = <2>;
-		st,fs-rftime-tuning;
-		st,hs-rftime-reduction;
-		st,hs-current-trim = <15>;
-		st,hs-impedance-trim = <1>;
-		st,squelch-level = <3>;
-		st,hs-rx-offset = <2>;
-		st,no-lsfs-sc;
-	};
-};
-
-&bsec {
-	status = "okay";
 };
 
 &rcc {

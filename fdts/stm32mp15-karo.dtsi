@@ -19,19 +19,10 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
+};
 
-	sram: sram@10050000 {
-		compatible = "mmio-sram";
-		reg = <0x10050000 0x10000>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges = <0 0x10050000 0x10000>;
-
-		dma_pool: dma_pool@0 {
-			reg = <0x0 0x10000>;
-			pool;
-		};
-	};
+&bsec {
+	status = "okay";
 };
 
 &etzpc {
@@ -63,8 +54,6 @@
 		STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR
 	>;
 	system_off_soc_mode = <STM32_PM_CSTOP_ALLOW_STANDBY_DDR_OFF>;
-	//vdd-supply = <&vdd>;
-	//vdd_3v3_usbfs-supply = <&vdd_usb>;
 };
 
 &rng1 {
