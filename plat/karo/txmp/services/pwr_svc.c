@@ -1,41 +1,19 @@
 /*
- * Copyright (c) 2017-2018, STMicroelectronics - All Rights Reserved
- * Copyright (c) 2017-2018 ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
-#include <debug.h>
-#include <mmio.h>
 #include <platform_def.h>
-#include <spinlock.h>
+
+#include <common/debug.h>
+#include <drivers/st/stm32mp1_pwr.h>
+#include <lib/mmio.h>
+
 #include <stm32mp_common.h>
-#include <stm32mp1_pwr.h>
 #include <stm32mp1_smc.h>
+
 #include "pwr_svc.h"
-
-static struct spinlock lock;
-
-void pwr_regs_lock(void)
-{
-	const uint32_t mask = SCTLR_M_BIT | SCTLR_C_BIT;
-
-	/* Lock is currently required only when MMU and cache are enabled */
-	if ((read_sctlr() & mask) == mask) {
-		spin_lock(&lock);
-	}
-}
-
-void pwr_regs_unlock(void)
-{
-	const uint32_t mask = SCTLR_M_BIT | SCTLR_C_BIT;
-
-	/* Unlock is required only when MMU and cache are enabled */
-	if ((read_sctlr() & mask) == mask) {
-		spin_unlock(&lock);
-	}
-}
 
 static void access_allowed_mask(uint32_t request, uint32_t offset,
 				uint32_t value, uint32_t allowed_mask)
@@ -43,7 +21,7 @@ static void access_allowed_mask(uint32_t request, uint32_t offset,
 	uint32_t addr = stm32mp_pwr_base() + offset;
 	uint32_t masked_value = value & allowed_mask;
 
-	pwr_regs_lock();
+	stm32mp_pwr_regs_lock();
 
 	switch (request) {
 	case STM32_SMC_REG_WRITE:
@@ -68,7 +46,7 @@ static void access_allowed_mask(uint32_t request, uint32_t offset,
 		break;
 	}
 
-	pwr_regs_unlock();
+	stm32mp_pwr_regs_unlock();
 }
 
 static void raw_allowed_access_request(uint32_t request,
@@ -99,7 +77,7 @@ static void raw_allowed_access_request(uint32_t request,
 	}
 }
 
-uint32_t pwr_scv_handler(uint32_t x1, uint32_t x2, uint32_t x3)
+uint32_t pwr_svc_handler(uint32_t x1, uint32_t x2, uint32_t x3)
 {
 	uint32_t request = x1;
 	uint32_t offset = x2;

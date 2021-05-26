@@ -3,8 +3,10 @@
  * Copyright (C) Lothar Waßmann <LW@KARO-electronics.de>
  */
 
-#include "stm32mp157c.dtsi"
-#include "stm32mp157cac-pinctrl.dtsi"
+#include "stm32mp157.dtsi"
+#include "stm32mp15xc.dtsi"
+#include "stm32mp15-pinctrl.dtsi"
+#include "stm32mp15xxac-pinctrl.dtsi"
 #include "stm32mp15-karo.dtsi"
 
 / {
@@ -50,12 +52,6 @@
 };
 
 &bsec {
-	status = "okay";
-	secure-status = "okay";
-};
-
-&iwdg2 {
-	timeout-sec = <32>;
 	status = "okay";
 };
 
@@ -124,7 +120,6 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
-	secure-status = "okay";
 
 	st,pll@0 {
 		reg = <0>;
@@ -152,7 +147,6 @@
 
 &rtc {
 	status = "okay";
-	secure-status = "okay";
 };
 
 &sdmmc2 {
@@ -190,15 +184,6 @@
 
 &usbotg_hs {
 	status = "okay";
-};
-
-&pwr {
-	system_suspend_supported_soc_modes = <
-		STM32_PM_CSLEEP_RUN
-		STM32_PM_CSTOP_ALLOW_LP_STOP
-		STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR
-	>;
-	system_off_soc_mode = <STM32_PM_CSTOP_ALLOW_STANDBY_DDR_OFF>;
 };
 
 &pinctrl {

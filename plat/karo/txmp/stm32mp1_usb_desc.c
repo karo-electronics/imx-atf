@@ -1,18 +1,21 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <bsec.h>
-#include <debug.h>
 #include <limits.h>
+#include <string.h>
+
 #include <platform_def.h>
+
+#include <common/debug.h>
+#include <drivers/st/bsec.h>
+#include <lib/usb/usb_core.h>
+#include <lib/usb/usb_st_dfu.h>
+
 #include <stm32mp_common.h>
 #include <stm32mp1_usb_desc.h>
-#include <string.h>
-#include <usb_core.h>
-#include <usb_st_dfu.h>
 
 /* USB Standard Device Descriptor */
 static const uint8_t usb_stm32mp1_desc[USB_LEN_DEV_DESC] = {
@@ -66,7 +69,7 @@ static uint8_t usb_stm32mp1_serial[USB_SIZ_STRING_SERIAL + 1] = {
 
 /* USB DFU device Configuration Descriptor */
 static uint8_t usb_stm32mp1_config_desc[USB_DFU_CONFIG_DESC_SIZ] = {
-	0x09, /* bLength: Configuation Descriptor size */
+	0x09, /* bLength: Configuration Descriptor size */
 	USB_DESC_TYPE_CONFIGURATION, /* bDescriptorType: Configuration */
 	USB_DFU_CONFIG_DESC_SIZ,
 	/* wTotalLength: Bytes returned */

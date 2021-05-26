@@ -1,31 +1,23 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef __PLAT_DBGMCU_H__
-#define __PLAT_DBGMCU_H__
+#ifndef STM32MP1_DBGMCU_H
+#define STM32MP1_DBGMCU_H
 
 #include <stdint.h>
 
-#if LOG_LEVEL >= LOG_LEVEL_VERBOSE
-#define VERBOSE_HEXDUMP8(buf, len) stm32mp1_dbgmcu_hexdump8(buf, len)
-#define VERBOSE_HEXDUMP32(buf, len) stm32mp1_dbgmcu_hexdump32(buf, len)
-#else
-#define VERBOSE_HEXDUMP8(buf, len)
-#define VERBOSE_HEXDUMP32(buf, len)
-#endif
-#define HEXDUMP8(buf, len) stm32mp1_dbgmcu_hexdump8(buf, len)
-#define HEXDUMP32(buf, len) stm32mp1_dbgmcu_hexdump32(buf, len)
-
+/* Get chip version and ID from DBGMCU registers */
 int stm32mp1_dbgmcu_get_chip_version(uint32_t *chip_version);
 int stm32mp1_dbgmcu_get_chip_dev_id(uint32_t *chip_dev_id);
-int stm32mp1_dbgmcu_freeze_iwdg2(void);
-int stm32mp1_dbgmcu_boot_debug_info(void);
-void stm32mp1_dbgmcu_clear_boot_info(void);
-bool stm32mp1_dbgmcu_is_debug_on(void);
-void stm32mp1_dbgmcu_hexdump8(const void *buf, uint32_t len);
-void stm32mp1_dbgmcu_hexdump32(const void *buf, uint32_t len);
 
-#endif /* __PLAT_DBGMCU_H__ */
+/*
+ * Freeze watchdog when a debugger is attached, if the security configuration
+ * allows it.
+ * Return 0 on success, a negative error value otherwise.
+ */
+int stm32mp1_dbgmcu_freeze_iwdg2(void);
+
+#endif /* STM32MP1_DBGMCU_H */

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <platform_def.h>
+
 #include <arch.h>
 #include <asm_macros.S>
-#include <bl_common.h>
-#include <platform_def.h>
+#include <common/bl_common.h>
+#include <drivers/st/stm32_gpio.h>
 #include <smccc_helpers.h>
-#include <stm32_gpio.h>
-#include <stm32mp1_rcc.h>
 
 #define GPIO_TX_SHIFT		(DEBUG_UART_TX_GPIO_PORT << 1)
 
@@ -46,17 +46,20 @@ func plat_report_exception
 	bne	undef_inst_lbl
 	ldr	r4, =abort_str
 	bl	asm_print_str
-	b	print_excpetion_info
+	mrs	r4, lr_abt
+	sub	r4, r4, #4
+	b	print_exception_info
 
 undef_inst_lbl:
 	/* Test for an undefined instruction */
 	cmp	r0, #MODE32_und
-	bne	other_excpetion_lbl
+	bne	other_exception_lbl
 	ldr	r4, =undefined_str
 	bl	asm_print_str
-	b	print_excpetion_info
+	mrs	r4, lr_und
+	b	print_exception_info
 
-other_excpetion_lbl:
+other_exception_lbl:
 	/* Other exceptions */
 	mov	r9, r0
 	ldr	r4, =exception_start_str
@@ -65,10 +68,9 @@ other_excpetion_lbl:
 	bl	asm_print_hex
 	ldr	r4, =exception_end_str
 	bl	asm_print_str
+	mov	r4, r6
 
-print_excpetion_info:
-	mrs	r4, lr_svc
-	sub	r4, r4, #4
+print_exception_info:
 	bl	asm_print_hex
 
 	ldr	r4, =end_error_str
@@ -265,15 +267,19 @@ func plat_crash_console_init
 	str	r2, [r1, #GPIO_PUPD_OFFSET]
 	/* Set alternate */
 	ldr	r2, =DEBUG_UART_TX_GPIO_PORT
-	cmp	r2, #GPIO_ALT_LOWER_LIMIT
-	ldrge	r2, [r1, #GPIO_AFRH_OFFSET]
-	bicge	r2, r2, #(GPIO_ALTERNATE_MASK << ((DEBUG_UART_TX_GPIO_PORT - GPIO_ALT_LOWER_LIMIT) << 2))
-	orrge	r2, r2, #(DEBUG_UART_TX_GPIO_ALTERNATE << ((DEBUG_UART_TX_GPIO_PORT - GPIO_ALT_LOWER_LIMIT) << 2))
-	strge	r2, [r1, #GPIO_AFRH_OFFSET]
-	ldrlt	r2, [r1, #GPIO_AFRL_OFFSET]
-	biclt	r2, r2, #(GPIO_ALTERNATE_MASK << (DEBUG_UART_TX_GPIO_PORT << 2))
-	orrlt	r2, r2, #(DEBUG_UART_TX_GPIO_ALTERNATE << (DEBUG_UART_TX_GPIO_PORT << 2))
-	strlt	r2, [r1, #GPIO_AFRL_OFFSET]
+#if DEBUG_UART_TX_GPIO_PORT >= GPIO_ALT_LOWER_LIMIT
+	ldr	r2, [r1, #GPIO_AFRH_OFFSET]
+	bic	r2, r2, #(GPIO_ALTERNATE_MASK << \
+				((DEBUG_UART_TX_GPIO_PORT - GPIO_ALT_LOWER_LIMIT) << 2))
+	orr	r2, r2, #(DEBUG_UART_TX_GPIO_ALTERNATE << \
+				((DEBUG_UART_TX_GPIO_PORT - GPIO_ALT_LOWER_LIMIT) << 2))
+	str	r2, [r1, #GPIO_AFRH_OFFSET]
+#else
+	ldr	r2, [r1, #GPIO_AFRL_OFFSET]
+	bic	r2, r2, #(GPIO_ALTERNATE_MASK << (DEBUG_UART_TX_GPIO_PORT << 2))
+	orr	r2, r2, #(DEBUG_UART_TX_GPIO_ALTERNATE << (DEBUG_UART_TX_GPIO_PORT << 2))
+	str	r2, [r1, #GPIO_AFRL_OFFSET]
+#endif
 	/* Enable UART clock, with its source */
 	ldr	r1, =(RCC_BASE + DEBUG_UART_TX_CLKSRC_REG)
 	mov	r2, #DEBUG_UART_TX_CLKSRC

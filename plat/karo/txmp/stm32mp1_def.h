@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,44 +7,40 @@
 #ifndef STM32MP1_DEF_H
 #define STM32MP1_DEF_H
 
-#ifndef __ASSEMBLY__
-#include <boot_api.h>
-#include <bsec.h>
+#include <common/tbbr/tbbr_img_def.h>
+#include <drivers/st/stm32mp1_rcc.h>
 #include <dt-bindings/clock/stm32mp1-clks.h>
-#include <dt-bindings/clock/stm32mp1-clksrc.h>
 #include <dt-bindings/reset/stm32mp1-resets.h>
 #include <dt-bindings/soc/st,stm32-etzpc.h>
-#include <etzpc.h>
-#include <stm32mp_auth.h>
+#include <lib/utils_def.h>
+#include <lib/xlat_tables/xlat_tables_defs.h>
+
+#ifndef __ASSEMBLER__
+#include <drivers/st/bsec.h>
+#include <drivers/st/stm32mp1_calib.h>
+#include <drivers/st/stm32mp1_clk.h>
+#include <drivers/st/stm32mp1_ddr_regs.h>
+#include <drivers/st/stm32mp1_pwr.h>
+#include <drivers/st/stm32mp1xx_hal_uart.h>
+
+#include <boot_api.h>
 #include <stm32mp_common.h>
 #include <stm32mp_dt.h>
 #include <stm32mp_shres_helpers.h>
-#include <stm32mp1_calib.h>
-#include <stm32mp1_clkfunc.h>
-#include <stm32mp1_clk.h>
+#include <stm32mp1_boot_device.h>
 #include <stm32mp1_context.h>
 #include <stm32mp1_dbgmcu.h>
-#include <stm32mp1_ddr.h>
-#include <stm32mp1_ddr_helpers.h>
-#include <stm32mp1_ddr_regs.h>
 #include <stm32mp1_private.h>
-#include <stm32mp1_pwr.h>
-#include <stm32mp1_ram.h>
-#include <stm32mp1_rcc.h>
 #include <stm32mp1_shared_resources.h>
 #include <stm32mp1_usb_desc.h>
-#include <stm32mp1xx_hal_uart.h>
 #include <usb_ctx.h>
 #endif
-#include <tbbr_img_def.h>
-#include <utils_def.h>
-#include <xlat_tables_defs.h>
-
-#define AUTHENTICATE_BL33
 
 /*******************************************************************************
  * CHIP ID
  ******************************************************************************/
+#define STM32MP1_CHIP_ID	U(0x500)
+
 #define STM32MP157C_PART_NB	U(0x05000000)
 #define STM32MP157A_PART_NB	U(0x05000001)
 #define STM32MP153C_PART_NB	U(0x05000024)
@@ -58,15 +54,14 @@
 #define STM32MP151F_PART_NB	U(0x050000AE)
 #define STM32MP151D_PART_NB	U(0x050000AF)
 
-#define STM32MP1_REV_A		U(0x1000)
 #define STM32MP1_REV_B		U(0x2000)
 #define STM32MP1_REV_Z		U(0x2001)
 
 /*******************************************************************************
  * PACKAGE ID
  ******************************************************************************/
-#define PKG_AA_LBGA448		U(4)
-#define PKG_AB_LBGA354		U(3)
+#define PKG_AA_LFBGA448		U(4)
+#define PKG_AB_LFBGA354		U(3)
 #define PKG_AC_TFBGA361		U(2)
 #define PKG_AD_TFBGA257		U(1)
 
@@ -84,7 +79,7 @@
 #define STM32MP_SYSRAM_BASE		U(0x2FFC0000)
 #define STM32MP_SYSRAM_SIZE		U(0x00040000)
 
-/* 384 Ko (128 x 3) Non secure from MCU available for TF*/
+/* 384 KB (128 x 3) Non secure from MCU available for TF */
 #define STM32MP_SRAM_MCU_BASE		U(0x30000000)
 #define STM32MP_SRAM_MCU_SIZE		U(0x00060000)
 
@@ -94,6 +89,15 @@
 #define STM32MP_BACKUP_RAM_BASE		U(0x54000000)
 #define STM32MP_BACKUP_RAM_SIZE		U(0x00001000)
 
+#define STM32MP_NS_SYSRAM_SIZE		PAGE_SIZE
+#define STM32MP_NS_SYSRAM_BASE		(STM32MP_SYSRAM_BASE + \
+					 STM32MP_SYSRAM_SIZE - \
+					 STM32MP_NS_SYSRAM_SIZE)
+
+#define STM32MP_SEC_SYSRAM_BASE		STM32MP_SYSRAM_BASE
+#define STM32MP_SEC_SYSRAM_SIZE		(STM32MP_SYSRAM_SIZE - \
+					 STM32MP_NS_SYSRAM_SIZE)
+
 /* DDR configuration */
 #define STM32MP_DDR_BASE		U(0xC0000000)
 #define STM32MP_DDR_MAX_SIZE		U(0x40000000)	/* Max 1GB */
@@ -101,73 +105,70 @@
 #define STM32MP_DDR_S_SIZE		U(0x01E00000)	/* 30 MB */
 #define STM32MP_DDR_SHMEM_SIZE		U(0x00200000)	/* 2 MB */
 #else
-#define STM32MP_DDR_S_SIZE		U(0)		/* DDR is non secure */
+#define STM32MP_DDR_S_SIZE		U(0)
+#define STM32MP_DDR_SHMEM_SIZE		U(0)
 #endif
 
 /* DDR power initializations */
-#ifndef __ASSEMBLY__
+#ifndef __ASSEMBLER__
 enum ddr_type {
 	STM32MP_DDR3,
 	STM32MP_LPDDR2,
-	STM32MP_LPDDR3,
+	STM32MP_LPDDR3
 };
 #endif
 
 /* Section used inside TF binaries */
-#define STM32MP_PARAM_LOAD_SIZE		U(0x00002400)	/* 9 Ko for param */
+#define STM32MP_PARAM_LOAD_SIZE		U(0x00002400)	/* 9 KB for param */
 /* 256 Octets reserved for header */
 #define STM32MP_HEADER_SIZE		U(0x00000100)
 
-#define STM32MP_BINARY_BASE		(STM32MP_SYSRAM_BASE +		\
+#define STM32MP_BINARY_BASE		(STM32MP_SEC_SYSRAM_BASE +	\
 					 STM32MP_PARAM_LOAD_SIZE +	\
 					 STM32MP_HEADER_SIZE)
 
-#define STM32MP_BINARY_SIZE		(STM32MP_SYSRAM_SIZE -		\
+#define STM32MP_BINARY_SIZE		(STM32MP_SEC_SYSRAM_SIZE -	\
 					 (STM32MP_PARAM_LOAD_SIZE +	\
 					  STM32MP_HEADER_SIZE))
 
 #ifdef AARCH32_SP_OPTEE
 #define STM32MP_BL32_SIZE		U(0)
 
-#define STM32MP_OPTEE_BASE		STM32MP_SYSRAM_BASE
+#define STM32MP_OPTEE_BASE		STM32MP_SEC_SYSRAM_BASE
 
 #define STM32MP_OPTEE_SIZE		(STM32MP_DTB_BASE -  \
 					 STM32MP_OPTEE_BASE)
 #else
-#if STACK_PROTECTOR_ENABLED
-#define STM32MP_BL32_SIZE		U(0x00012000)	/* 72 Ko for BL32 */
-#else
-#define STM32MP_BL32_SIZE		U(0x00011000)	/* 68 Ko for BL32 */
-#endif
+#define STM32MP_BL32_SIZE		U(0x00014000)	/* 80 KB for BL32 */
 #endif
 
-#define STM32MP_BL32_BASE		(STM32MP_SYSRAM_BASE + \
-					 STM32MP_SYSRAM_SIZE - \
+#define STM32MP_BL32_BASE		(STM32MP_SEC_SYSRAM_BASE + \
+					 STM32MP_SEC_SYSRAM_SIZE - \
 					 STM32MP_BL32_SIZE)
 
 #ifdef AARCH32_SP_OPTEE
 #if STACK_PROTECTOR_ENABLED
-#define STM32MP_BL2_SIZE		U(0x0001A000)	/* 104 Ko for BL2 */
+#define STM32MP_BL2_SIZE		U(0x0001A000)	/* 104 KB for BL2 */
 #else
-#define STM32MP_BL2_SIZE		U(0x00018000)	/* 96 Ko for BL2 */
+#define STM32MP_BL2_SIZE		U(0x00018000)	/* 96 KB for BL2 */
 #endif
 #else
 #if STACK_PROTECTOR_ENABLED
-#define STM32MP_BL2_SIZE		U(0x00019000)	/* 100 Ko for BL2 */
+#define STM32MP_BL2_SIZE		U(0x00019000)	/* 100 KB for BL2 */
 #else
-#define STM32MP_BL2_SIZE		U(0x00017000)	/* 92 Ko for BL2 */
+#define STM32MP_BL2_SIZE		U(0x00017000)	/* 92 KB for BL2 */
 #endif
 #endif
 
 #define STM32MP_BL2_BASE		(STM32MP_BL32_BASE - \
 					 STM32MP_BL2_SIZE)
 
-#if defined(STM32MP_USB)
-/* BL2 and BL32/sp_min require 5 finer granularity tables */
- #define MAX_XLAT_TABLES			U(5)		/* 20 Ko for mapping */
+#if STM32MP_USB_PROGRAMMER
+ /* BL2 and BL32/sp_min require 5 finer granularity tables */
+ #define MAX_XLAT_TABLES			U(5)	/* 20 KB for mapping */
 #else
-/* BL2 and BL32/sp_min require 4 finer granularity tables */
- #define MAX_XLAT_TABLES			U(4)		/* 16 Ko for mapping */
+ /* BL2 and BL32/sp_min require 4 finer granularity tables */
+ #define MAX_XLAT_TABLES			U(4)	/* 16 KB for mapping */
 #endif
 
 /*
@@ -175,14 +176,14 @@ enum ddr_type {
  * BL stm32mp1_mmap size + mmap regions in *_plat_arch_setup
  */
 #if defined(IMAGE_BL2)
- #if defined(STM32MP_USB)
+ #if STM32MP_USB_PROGRAMMER
   #define MAX_MMAP_REGIONS		12
  #else
   #define MAX_MMAP_REGIONS		11
  #endif
 #endif
 #if defined(IMAGE_BL32)
-   #define MAX_MMAP_REGIONS		6
+  #define MAX_MMAP_REGIONS		6
 #endif
 
 #define XLAT_TABLE_OCTETSIZE		U(0x1000)
@@ -192,15 +193,8 @@ enum ddr_type {
 #define PLAT_XLAT_BASE			(STM32MP_BL2_BASE -	\
 					 PLAT_XLAT_SIZE)
 
-/*
- * Uncomment this to get the xlat tables back in each binary image
- * (xlat_table sections in .lds)
- *
- * #undef PLAT_XLAT_BASE
- */
-
 /* DTB initialization value */
-#define STM32MP_DTB_SIZE		U(0x00005000)	/* 20Ko for DTB */
+#define STM32MP_DTB_SIZE		U(0x00006000)	/* 24 KB for DTB */
 
 #define STM32MP_DTB_BASE		(PLAT_XLAT_BASE -	\
 					 STM32MP_DTB_SIZE)
@@ -208,16 +202,25 @@ enum ddr_type {
 #define STM32MP_BL33_BASE		(STM32MP_DDR_BASE + U(0x100000))
 
 /* Define Temporary Stack size use during low power mode */
-#define STM32MP_INT_STACK_SIZE		0x400
+#define STM32MP_INT_STACK_SIZE		0x200
+
+/* Define maximum page size for NAND devices */
+#define PLATFORM_MTD_MAX_PAGE_SIZE	U(0x1000)
+
+/*
+ * Only used for MTD devices that need some backup blocks.
+ * Must define a number of reserved blocks (depends on devices).
+ */
+#define PLATFORM_MTD_BACKUP_BLOCKS	U(20)	/* (20 * MTD block size) */
 
 /*******************************************************************************
  * STM32MP1 RAW partition offset for MTD devices
  ******************************************************************************/
 #define STM32MP_NOR_BL33_OFFSET		U(0x00080000)
 #ifdef AARCH32_SP_OPTEE
-#define STM32MP_NOR_TEEH_OFFSET		U(0x00280000)
-#define STM32MP_NOR_TEED_OFFSET		U(0x002C0000)
-#define STM32MP_NOR_TEEX_OFFSET		U(0x00300000)
+#define STM32MP_NOR_TEEH_OFFSET		U(0x00300000)
+#define STM32MP_NOR_TEED_OFFSET		U(0x00340000)
+#define STM32MP_NOR_TEEX_OFFSET		U(0x003C0000)
 #endif
 
 #define STM32MP_NAND_BL33_OFFSET	U(0x00200000)
@@ -245,6 +248,11 @@ enum ddr_type {
  * STM32MP1 PWR
  ******************************************************************************/
 #define PWR_BASE			U(0x50001000)
+
+/*******************************************************************************
+ * STM32MP1 SYSCFG
+ ******************************************************************************/
+#define SYSCFG_BASE			U(0x50020000)
 
 /*******************************************************************************
  * STM32MP1 EXTI
@@ -328,7 +336,7 @@ enum ddr_type {
 #define DEBUG_UART_TX_EN		RCC_MP_APB1ENSETR_UART4EN
 
 /*******************************************************************************
- * STM32MP1 TZPC
+ * STM32MP1 ETZPC
  ******************************************************************************/
 #define STM32MP1_ETZPC_BASE		U(0x5C007000)
 #define STM32MP1_ETZPC_SIZE		U(0x000003FF)
@@ -336,6 +344,11 @@ enum ddr_type {
 #define STM32MP1_ETZPC_TZMA_ROM_ID	U(0)
 /*SYSRAM internal RAM*/
 #define STM32MP1_ETZPC_TZMA_RAM_ID	U(1)
+
+/* Lowest DECPROT ID for ETZPC cannot harden TZ security */
+#define STM32MP1_ETZPC_SEC_ID_LIMIT	U(13)
+
+#define STM32MP1_ETZPC_TZMA_ALL_SECURE	GENMASK_32(9, 0)
 
 /*******************************************************************************
  * STM32MP1 TZC (TZ400)
@@ -370,90 +383,90 @@ enum ddr_type {
 #define STM32MP_EMMC_HIGH_SPEED_MAX_FREQ	U(52000000)	/*52 MHz*/
 
 /*******************************************************************************
- * STM32MP1 QSPI
- ******************************************************************************/
-#define STM32MP1_QSPI1_BASE		U(0x58003000)
-
-/*******************************************************************************
  * STM32MP1 BSEC / OTP
  ******************************************************************************/
-#define STM32MP1_BSEC_BASE		U(0x5C005000)
 #define STM32MP1_OTP_MAX_ID		0x5FU
 #define STM32MP1_UPPER_OTP_START	0x20U
 
 #define OTP_MAX_SIZE			(STM32MP1_OTP_MAX_ID + 1U)
 
 /* OTP labels */
+#define CFG0_OTP			"cfg0_otp"
 #define PART_NUMBER_OTP			"part_number_otp"
 #define PACKAGE_OTP			"package_otp"
 #define HW2_OTP				"hw2_otp"
 #define NAND_OTP			"nand_otp"
 #define MONOTONIC_OTP			"monotonic_otp"
 #define UID_OTP				"uid_otp"
-#define BOARD_ID_OTP			"board_id"
+#define PKH_OTP				"pkh_otp"
+//#define BOARD_ID_OTP			"board_id"
 
 /* OTP mask */
+/* CFG0 */
+#define CFG0_CLOSED_DEVICE		BIT(6)
+
 /* PART NUMBER */
-#define PART_SHIFT			0
-#define PART_MASK			GENMASK_32(7, 0)
+#define PART_NUMBER_OTP_PART_MASK	GENMASK_32(7, 0)
+#define PART_NUMBER_OTP_PART_SHIFT	0
 
 /* PACKAGE */
-#define PKG_SHIFT			27
-#define PKG_MASK			GENMASK_32(29, 27)
+#define PACKAGE_OTP_PKG_MASK		GENMASK_32(29, 27)
+#define PACKAGE_OTP_PKG_SHIFT		27
 
 /* IWDG OTP */
-#define IWDG_HW_POS			3
-#define IWDG_FZ_STOP_POS		5
-#define IWDG_FZ_STANDBY_POS		7
+#define HW2_OTP_IWDG_HW_POS		U(3)
+#define HW2_OTP_IWDG_FZ_STOP_POS	U(5)
+#define HW2_OTP_IWDG_FZ_STANDBY_POS	U(7)
 
 /* HW2 OTP */
 #define HW2_OTP_PRODUCT_BELOW_2V5	BIT(13)
 
+#define MAX_MONOTONIC_VALUE		32
+
 /* NAND OTP */
 /* NAND parameter storage flag */
-#define NAND_PARAM_STORED_IN_OTP	U(0x80000000)
+#define NAND_PARAM_STORED_IN_OTP	BIT(31)
 
 /* NAND page size in bytes */
-#define NAND_PAGE_SIZE_OFFSET		29
-#define NAND_PAGE_SIZE_MASK		U(0x60000000)
-#define NAND_PAGE_SIZE_2K		0
-#define NAND_PAGE_SIZE_4K		1
-#define NAND_PAGE_SIZE_8K		2
+#define NAND_PAGE_SIZE_MASK		GENMASK_32(30, 29)
+#define NAND_PAGE_SIZE_SHIFT		29
+#define NAND_PAGE_SIZE_2K		U(0)
+#define NAND_PAGE_SIZE_4K		U(1)
+#define NAND_PAGE_SIZE_8K		U(2)
 
 /* NAND block size in pages */
-#define NAND_BLOCK_SIZE_OFFSET		27
-#define NAND_BLOCK_SIZE_MASK		U(0x18000000)
-#define NAND_BLOCK_SIZE_64_PAGES	0
-#define NAND_BLOCK_SIZE_128_PAGES	1
-#define NAND_BLOCK_SIZE_256_PAGES	2
+#define NAND_BLOCK_SIZE_MASK		GENMASK_32(28, 27)
+#define NAND_BLOCK_SIZE_SHIFT		27
+#define NAND_BLOCK_SIZE_64_PAGES	U(0)
+#define NAND_BLOCK_SIZE_128_PAGES	U(1)
+#define NAND_BLOCK_SIZE_256_PAGES	U(2)
 
 /* NAND number of block (in unit of 256 blocs) */
-#define NAND_BLOCK_NB_OFFSET		19
-#define NAND_BLOCK_NB_MASK		U(0x07F80000)
+#define NAND_BLOCK_NB_MASK		GENMASK_32(26, 19)
+#define NAND_BLOCK_NB_SHIFT		19
 #define NAND_BLOCK_NB_UNIT		U(256)
 
 /* NAND bus width in bits */
-#define NAND_WIDTH_OFFSET		18
-#define NAND_WIDTH_MASK			0x00040000
+#define NAND_WIDTH_MASK			BIT(18)
+#define NAND_WIDTH_SHIFT		18
 
 /* NAND number of ECC bits per 512 bytes */
-#define NAND_ECC_BIT_NB_OFFSET		16
-#define NAND_ECC_BIT_NB_MASK		U(0x00030000)
-#define NAND_ECC_BIT_NB_UNSET		0
-#define NAND_ECC_BIT_NB_1_BITS		1
-#define NAND_ECC_BIT_NB_4_BITS		2
-#define NAND_ECC_BIT_NB_8_BITS		3
+#define NAND_ECC_BIT_NB_MASK		GENMASK_32(17, 15)
+#define NAND_ECC_BIT_NB_SHIFT		15
+#define NAND_ECC_BIT_NB_UNSET		U(0)
+#define NAND_ECC_BIT_NB_1_BITS		U(1)
+#define NAND_ECC_BIT_NB_4_BITS		U(2)
+#define NAND_ECC_BIT_NB_8_BITS		U(3)
+#define NAND_ECC_ON_DIE			U(4)
+
+/* NAND number of planes */
+#define NAND_PLANE_BIT_NB_MASK		BIT(14)
 
 /* MONOTONIC OTP */
 #define MAX_MONOTONIC_VALUE		32
 
 /* UID OTP */
 #define UID_WORD_NB			3
-
-/*******************************************************************************
- * STM32MP1 FMC
- ******************************************************************************/
-#define STM32MP_FMC_BASE		U(0x58002000)
 
 /*******************************************************************************
  * STM32MP1 HASH
@@ -464,7 +477,7 @@ enum ddr_type {
 /*******************************************************************************
  * STM32MP1 TAMP
  ******************************************************************************/
-#define PLAT_MAX_TAMP_INT		U(5)
+#define PLAT_MAX_TAMP_INT		U(6)
 #define PLAT_MAX_TAMP_EXT		U(3)
 #define TAMP_BASE			U(0x5C00A000)
 #define TAMP_SMCR			(TAMP_BASE + U(0x20))
@@ -474,12 +487,13 @@ enum ddr_type {
 #define TAMP_BKP_SEC_RWDPROT_SHIFT	U(0)
 
 
-#if !(defined(__LINKER__) || defined(__ASSEMBLY__))
+#if !(defined(__LINKER__) || defined(__ASSEMBLER__))
 static inline uint32_t tamp_bkpr(uint32_t idx)
 {
 	return TAMP_BKP_REGISTER_BASE + (idx << 2);
 }
 #endif
+
 /*******************************************************************************
  * STM32MP1 USB
  ******************************************************************************/
@@ -532,6 +546,11 @@ static inline uint32_t tamp_bkpr(uint32_t idx)
 #define CRYP1_BASE	U(0x54001000)
 
 /*******************************************************************************
+ * STM32MP1 STGEN
+ ******************************************************************************/
+#define STGEN_BASE	U(0x5C008000)
+
+/*******************************************************************************
  * STM32MP1 TIMERS
  ******************************************************************************/
 #define TIM12_BASE			U(0x40006000)
@@ -556,12 +575,21 @@ static inline uint32_t tamp_bkpr(uint32_t idx)
 /*******************************************************************************
  * Device Tree defines
  ******************************************************************************/
+#define DT_BSEC_COMPAT			"st,stm32mp15-bsec"
+#define DT_DDR_COMPAT			"st,stm32mp1-ddr"
+#define DT_IWDG_COMPAT			"st,stm32mp1-iwdg"
 #define DT_NVMEM_LAYOUT_COMPAT		"st,stm32-nvmem-layout"
 #define DT_OPP_COMPAT			"operating-points-v2"
-#define DT_PWR_COMPAT			"st,stm32mp1-pwr"
+#define DT_PWR_COMPAT			"st,stm32mp1,pwr-reg"
 #define DT_RCC_CLK_COMPAT		"st,stm32mp1-rcc"
-#define DT_SYSCFG_COMPAT		"st,stm32mp157-syscfg"
 
 #define DT_PLL1_NODE_NAME		"st,pll@0"
+
+#ifndef __ASSEMBLER__
+static inline int dt_pmic_status(void)
+{
+	return 0;
+}
+#endif
 
 #endif /* STM32MP1_DEF_H */

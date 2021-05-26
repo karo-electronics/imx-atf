@@ -4,39 +4,40 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
 #include <assert.h>
-#include <bl_common.h>
-#include <bsec.h>
-#include <context.h>
-#include <context_mgmt.h>
-#include <debug.h>
-#include <dt-bindings/clock/stm32mp1-clks.h>
-#include <etzpc.h>
-#include <generic_delay_timer.h>
-#include <gicv2.h>
-#include <mmio.h>
-#include <platform.h>
-#include <platform_def.h>
-#include <platform_sp_min.h>
-#include <stm32_console.h>
-#include <stm32_gpio.h>
-#include <stm32_iwdg.h>
-#include <stm32_rng.h>
-#include <stm32_rtc.h>
-#include <stm32_tamp.h>
-#include <stm32_timer.h>
-#include <stm32mp_dt.h>
-#include <stm32mp1_clk.h>
-#include <stm32mp1_context.h>
-#include <stm32mp1_ddr_helpers.h>
-#include <stm32mp1_power_config.h>
-#include <stm32mp1_private.h>
-#include <stm32mp1_shared_resources.h>
-#include <stpmic1.h>
 #include <string.h>
-#include <tzc400.h>
-#include <xlat_tables_v2.h>
+
+#include <platform_def.h>
+
+#include <arch_helpers.h>
+#include <common/bl_common.h>
+#include <common/debug.h>
+#include <context.h>
+#include <drivers/arm/gicv2.h>
+#include <drivers/arm/tzc400.h>
+#include <drivers/generic_delay_timer.h>
+#include <drivers/st/bsec.h>
+#include <drivers/st/etzpc.h>
+#include <drivers/st/stm32_console.h>
+#include <drivers/st/stm32_gpio.h>
+#include <drivers/st/stm32_iwdg.h>
+#include <drivers/st/stm32_rng.h>
+#include <drivers/st/stm32_rtc.h>
+#include <drivers/st/stm32_tamp.h>
+#include <drivers/st/stm32_timer.h>
+#include <drivers/st/stm32mp_clkfunc.h>
+#include <drivers/st/stm32mp1_clk.h>
+#include <drivers/st/stm32mp1_ddr_helpers.h>
+#include <dt-bindings/clock/stm32mp1-clks.h>
+#include <lib/el3_runtime/context_mgmt.h>
+#include <lib/mmio.h>
+#include <lib/xlat_tables/xlat_tables_v2.h>
+#include <plat/common/platform.h>
+
+#include <platform_sp_min.h>
+#include <stm32mp1_power_config.h>
+
+#define _WARN(fmt...) do {} while (0)
 
 /******************************************************************************
  * Placeholder variables for copying the arguments that have been passed to
@@ -45,11 +46,34 @@
 static entry_point_info_t bl33_image_ep_info;
 
 static struct console_stm32 console;
+static void stm32mp1_tamper_action(int id);
+
+static const char *tamper_name[PLAT_MAX_TAMP_INT] = {
+	"RTC power domain",
+	"Temperature monitoring",
+	"LSE monitoring",
+	"HSE monitoring",
+	"RTC calendar overflow",
+	"Monotonic counter"
+};
 
 static struct stm32_tamp_int int_tamp[PLAT_MAX_TAMP_INT] = {
-	TAMP_UNUSED,
-	TAMP_UNUSED,
-	TAMP_UNUSED,
+	{
+		.id = ITAMP1,
+		.func = stm32mp1_tamper_action,
+	},
+	{
+		.id = ITAMP2,
+		.func = stm32mp1_tamper_action,
+	},
+	{
+		.id = ITAMP3,
+		.func = stm32mp1_tamper_action,
+	},
+	{
+		.id = ITAMP4,
+		.func = stm32mp1_tamper_action,
+	},
 	TAMP_UNUSED,
 	TAMP_UNUSED,
 };
@@ -86,6 +110,12 @@ static void stm32_sgi1_it_handler(void)
 	stm32mp_wait_cpu_reset();
 }
 
+static void stm32mp1_tamper_action(int id)
+{
+	ERROR("Tamper %s detected\n", tamper_name[id]);
+	stm32mp_plat_reset(plat_my_core_pos());
+}
+
 static void configure_wakeup_interrupt(void)
 {
 	int irq_num = fdt_rcc_enable_it("wakeup");
@@ -100,13 +130,20 @@ static void configure_wakeup_interrupt(void)
 
 static void initialize_pll1_settings(void)
 {
-	uint32_t vddcore_voltage = 1200000;
+	uint32_t cpu_voltage = 1200000;
 
 	if (stm32_are_pll1_settings_valid_in_context()) {
+		int ret = stm32_get_pll1_settings_from_context();
+		if (ret)
+			ERROR("Failed to reload PLL1 settings from BKPSRAM: %d\n",
+			      ret);
+		else
+			INFO("PLL1 settings restored from BKPSRAM\n");
 		return;
 	}
 
-	if (stm32mp1_clk_compute_all_pll1_settings(vddcore_voltage) != 0) {
+	if (stm32mp1_clk_compute_all_pll1_settings(cpu_voltage) != 0) {
+		ERROR("%s@%d: Failed\n", __func__, __LINE__);
 		panic();
 	}
 }
@@ -128,12 +165,18 @@ void sp_min_plat_fiq_handler(uint32_t id)
 		tzc400_init(STM32MP1_TZC_BASE);
 		tzc400_it_handler();
 		panic();
-		break;
 	case STM32MP1_IRQ_TAMPSERRS:
 		stm32_tamp_it_handler();
 		break;
 	case ARM_IRQ_SEC_SGI_1:
 		stm32_sgi1_it_handler();
+		break;
+	case ARM_IRQ_SEC_SGI_6:
+		/* tell the primary cpu to exit from stm32_pwr_down_wfi() */
+		if (plat_my_core_pos() == STM32MP_PRIMARY_CPU) {
+			stm32mp1_calib_set_wakeup(true);
+		}
+		gicv2_end_of_interrupt(ARM_IRQ_SEC_SGI_6);
 		break;
 	case STM32MP1_IRQ_IWDG1:
 	case STM32MP1_IRQ_IWDG2:
@@ -148,21 +191,20 @@ void sp_min_plat_fiq_handler(uint32_t id)
 			value = 0;
 			__asm__("mcr	p15, 1, %0, c9, c0, 3" :: "r" (value));
 		} else {
-			ERROR("IRQ_AXIERRIRQ handle call w/o any flag set!!\n");
+			ERROR("Spurious IRQ_AXIERRIRQ\n");
 		}
 
-		/* Check if FIQ has been generated due to TZC400 abort*/
+		/* Check if FIQ has been generated due to TZC400 abort */
 		if (tzc400_is_pending_interrupt()) {
 			tzc_it_handler();
 		} else {
-			ERROR("IRQ_AXIERRIRQ cause can't be detected");
+			ERROR("IRQ_AXIERRIRQ cause can't be detected\n");
 		}
 
 		panic();
-		break;
 	default:
-		ERROR("SECURE IT handler not define for it : %u", id);
-		break;
+		ERROR("SECURE IT handler not defined for it: %u\n",
+		      id & INT_ID_MASK);
 	}
 }
 
@@ -228,6 +270,37 @@ entry_point_info_t *sp_min_plat_get_bl33_ep_info(void)
 	return next_image_info;
 }
 
+CASSERT((STM32MP_SEC_SYSRAM_BASE >= STM32MP_SYSRAM_BASE) &&
+	((STM32MP_SEC_SYSRAM_BASE + STM32MP_SEC_SYSRAM_SIZE) <=
+	 (STM32MP_SYSRAM_BASE + STM32MP_SYSRAM_SIZE)),
+	assert_secure_sysram_fits_into_sysram);
+
+#ifdef STM32MP_NS_SYSRAM_BASE
+CASSERT((STM32MP_NS_SYSRAM_BASE >= STM32MP_SEC_SYSRAM_BASE) &&
+	((STM32MP_NS_SYSRAM_BASE + STM32MP_NS_SYSRAM_SIZE) ==
+	 (STM32MP_SYSRAM_BASE + STM32MP_SYSRAM_SIZE)),
+	assert_non_secure_sysram_fits_at_end_of_sysram);
+
+CASSERT((STM32MP_NS_SYSRAM_BASE & GENMASK(11, 0)) == 0,
+	assert_non_secure_sysram_base_is_4kbyte_aligned);
+
+/* Last 4kByte page (12 bit wide) of SYSRAM is non-secure */
+#define TZMA1_SECURE_RANGE \
+	(((STM32MP_NS_SYSRAM_BASE - STM32MP_SYSRAM_BASE) >> 12) - 1U)
+#else
+/* STM32MP_NS_SYSRAM_BASE not defined means all SYSRAM is secure */
+#define TZMA1_SECURE_RANGE		STM32MP1_ETZPC_TZMA_ALL_SECURE
+#endif /* STM32MP_NS_SYSRAM_BASE */
+
+#define TZMA0_SECURE_RANGE		STM32MP1_ETZPC_TZMA_ALL_SECURE
+
+static void stm32mp1_etzpc_early_setup(void)
+{
+	etzpc_init();
+	etzpc_configure_tzma(0U, TZMA0_SECURE_RANGE);
+	etzpc_configure_tzma(1U, TZMA1_SECURE_RANGE);
+}
+
 /*******************************************************************************
  * Perform any BL32 specific platform actions.
  ******************************************************************************/
@@ -237,34 +310,27 @@ void sp_min_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 #if STM32MP_UART_PROGRAMMER
 	uint32_t boot_itf, boot_instance;
 #endif
-	struct dt_node_info dt_dev_info;
+	struct dt_node_info dt_uart_info;
 	int result;
 	bl_params_t *params_from_bl2 = (bl_params_t *)arg0;
+	bl_params_node_t *bl_params;
+
+
 
 	/* Imprecise aborts can be masked in NonSecure */
 	write_scr(read_scr() | SCR_AW_BIT);
-
-	assert(params_from_bl2 != NULL);
-	assert(params_from_bl2->h.type == PARAM_BL_PARAMS);
-	assert(params_from_bl2->h.version >= VERSION_2);
-
-	bl_params_node_t *bl_params = params_from_bl2->head;
 
 	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE,
 			BL_CODE_END - BL_CODE_BASE,
 			MT_CODE | MT_SECURE);
 
-#if SEPARATE_CODE_AND_RODATA
-	mmap_add_region(BL_RO_DATA_BASE, BL_RO_DATA_BASE,
-			BL_RO_DATA_LIMIT - BL_RO_DATA_BASE,
-			MT_RO_DATA | MT_SECURE);
-#endif
-
-	mmap_add_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
-			dt_get_ddr_size() - STM32MP_DDR_S_SIZE,
-			MT_MEMORY | MT_RW | MT_NS);
-
 	configure_mmu();
+
+	assert(params_from_bl2 != NULL);
+	assert(params_from_bl2->h.type == PARAM_BL_PARAMS);
+	assert(params_from_bl2->h.version >= VERSION_2);
+
+	bl_params = params_from_bl2->head;
 
 	/*
 	 * Copy BL33 entry point information.
@@ -291,22 +357,34 @@ void sp_min_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 		panic();
 	}
 
-	/* Initialize uart for console except if it is used by programmer */
-	result = dt_get_stdout_uart_info(&dt_dev_info);
+	if (etzpc_init() != 0) {
+		panic();
+	}
+
+	stm32mp1_etzpc_early_setup();
+
+	result = dt_get_stdout_uart_info(&dt_uart_info);
 #if STM32MP_UART_PROGRAMMER
 	stm32_get_boot_interface(&boot_itf, &boot_instance);
 
-	if ((result > 0) && dt_dev_info.status &&
+	if ((result > 0) && (dt_uart_info.status != 0U) &&
 	    !((boot_itf == BOOT_API_CTX_BOOT_INTERFACE_SEL_SERIAL_UART) &&
-	      (get_uart_address(boot_instance) == dt_dev_info.base))) {
+	      (get_uart_address(boot_instance) == dt_uart_info.base))) {
 #else
-	if ((result > 0) && dt_dev_info.status) {
+	if ((result > 0) && (dt_uart_info.status != 0U)) {
 #endif
-		if (console_stm32_register(dt_dev_info.base, 0,
-					   STM32MP_UART_BAUDRATE, &console) ==
-		    0) {
+		unsigned int console_flags;
+
+		if (!console_stm32_register(dt_uart_info.base, 0,
+					    STM32MP_UART_BAUDRATE, &console))
 			panic();
-		}
+
+		console_flags = CONSOLE_FLAG_BOOT | CONSOLE_FLAG_CRASH |
+			CONSOLE_FLAG_TRANSLATE_CRLF;
+#ifdef DEBUG
+		console_flags |= CONSOLE_FLAG_RUNTIME;
+#endif
+		console_set_scope(&console.console, console_flags);
 	}
 
 	initialize_pll1_settings();
@@ -317,16 +395,11 @@ void sp_min_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 /*******************************************************************************
  * Set security setup in sp_min
  ******************************************************************************/
-void stm32mp1_sp_min_security_setup(void)
+static void stm32mp1_sp_min_security_setup(void)
 {
 	uint32_t filter_conf = 0;
 	uint32_t active_conf = 0;
 	int ret;
-
-	if (etzpc_init() != 0) {
-		ERROR("ETZPC configuration issue\n");
-		panic();
-	}
 
 	/* Init rtc driver */
 	ret = stm32_rtc_init();
@@ -367,7 +440,7 @@ void sp_min_platform_setup(void)
 
 	generic_delay_timer_init();
 
-	stm32mp1_gic_init();
+	stm32_gic_init();
 
 	/* Update security settings */
 	stm32mp1_sp_min_security_setup();
@@ -378,13 +451,11 @@ void sp_min_platform_setup(void)
 
 	configure_wakeup_interrupt();
 
-	stm32mp1_driver_init_late();
+	stm32mp_lock_periph_registering();
+
+	stm32mp1_init_scmi_server();
 }
 
 void sp_min_plat_arch_setup(void)
-{
-}
-
-void sp_min_plat_runtime_setup(void)
 {
 }

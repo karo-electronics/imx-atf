@@ -4,13 +4,18 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <debug.h>
-#include <psci.h>
-#include <runtime_svc.h>
-#include <stm32mp1_smc.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <uuid.h>
+
+#include <common/debug.h>
+#include <common/runtime_svc.h>
+#include <drivers/st/scmi-msg.h>
+#include <lib/psci/psci.h>
+#include <tools_share/uuid.h>
+
+#include <stm32mp1_low_power.h>
+#include <stm32mp1_smc.h>
+
 #include "bsec_svc.h"
 #include "low_power_svc.h"
 #include "pwr_svc.h"
@@ -66,24 +71,38 @@ static uintptr_t stm32mp1_svc_smc_handler(uint32_t smc_fid, u_register_t x1,
 		break;
 
 	case STM32_SMC_RCC:
-		ret1 = rcc_scv_handler(x1, x2, x3);
+		ret1 = rcc_svc_handler(x1, x2, x3);
 		break;
 
 	case STM32_SMC_RCC_CAL:
-		ret1 = rcc_cal_scv_handler(x1);
+		ret1 = rcc_cal_svc_handler(x1);
 		break;
 
 	case STM32_SMC_RCC_OPP:
-		ret1 = rcc_opp_scv_handler(x1, x2, &ret2);
+		ret1 = rcc_opp_svc_handler(x1, x2, &ret2);
 		ret2_enabled = true;
 		break;
 
 	case STM32_SMC_PWR:
-		ret1 = pwr_scv_handler(x1, x2, x3);
+		ret1 = pwr_svc_handler(x1, x2, x3);
 		break;
 
 	case STM32_SMC_PD_DOMAIN:
-		ret1 = pm_domain_scv_handler(x1, x2);
+		ret1 = pm_domain_svc_handler(x1, x2);
+		break;
+
+	case STM32_SMC_AUTO_STOP:
+		stm32_auto_stop();
+		ret1 = STM32_SMC_OK;
+		break;
+
+	case STM32_SMC_SCMI_MESSAGE_AGENT0:
+		scmi_smt_fastcall_smc_entry(0U);
+		ret1 = STM32_SMC_OK;
+		break;
+	case STM32_SMC_SCMI_MESSAGE_AGENT1:
+		scmi_smt_fastcall_smc_entry(1U);
+		ret1 = STM32_SMC_OK;
 		break;
 
 	default:

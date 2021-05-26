@@ -1,18 +1,18 @@
 /*
- * Copyright (c) 2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <debug.h>
-#include <dt-bindings/clock/stm32mp1-clks.h>
-#include <mmio.h>
 #include <platform_def.h>
+
+#include <common/debug.h>
+#include <drivers/st/stm32mp1_clk.h>
+#include <lib/mmio.h>
+
 #include <stm32mp_common.h>
 #include <stm32mp_dt.h>
-#include <stm32mp1_clk.h>
 #include <stm32mp1_private.h>
-#include <stpmic1.h>
 
 /*
  * SYSCFG register offsets (base relative)
@@ -22,11 +22,13 @@
 #define SYSCFG_ICNR				0x1CU
 #define SYSCFG_CMPCR				0x20U
 #define SYSCFG_CMPENSETR			0x24U
+#define SYSCFG_CMPENCLRR			0x28U
 
 /*
  * SYSCFG_BOOTR Register
  */
 #define SYSCFG_BOOTR_BOOT_MASK			GENMASK(2, 0)
+#define SYSCFG_BOOTR_BOOTPD_MASK		GENMASK(6, 4)
 #define SYSCFG_BOOTR_BOOTPD_SHIFT		4
 /*
  * SYSCFG_IOCTRLSETR Register
@@ -64,38 +66,32 @@ void stm32mp1_syscfg_init(void)
 	uint32_t bootr;
 	uint32_t otp_value;
 	uint32_t vdd_voltage;
-	uintptr_t syscfg_base = dt_get_syscfg_base();
 	bool product_below_2v5;
 
 	/*
 	 * Interconnect update : select master using the port 1.
 	 * LTDC = AXI_M9.
 	 */
-	mmio_write_32(syscfg_base + SYSCFG_ICNR, SYSCFG_ICNR_AXI_M9);
-	VERBOSE("[0x%x] SYSCFG.icnr = 0x%08x (LTDC)\n",
-		(uint32_t)syscfg_base + SYSCFG_ICNR,
-		mmio_read_32(syscfg_base + SYSCFG_ICNR));
+	mmio_write_32(SYSCFG_BASE + SYSCFG_ICNR, SYSCFG_ICNR_AXI_M9);
 
 	/* Disable Pull-Down for boot pin connected to VDD */
-	bootr = mmio_read_32(syscfg_base + SYSCFG_BOOTR);
-	bootr &= ~(SYSCFG_BOOTR_BOOT_MASK << SYSCFG_BOOTR_BOOTPD_SHIFT);
-	bootr |= (bootr & SYSCFG_BOOTR_BOOT_MASK) << SYSCFG_BOOTR_BOOTPD_SHIFT;
-	mmio_write_32(syscfg_base + SYSCFG_BOOTR, bootr);
-	VERBOSE("[0x%x] SYSCFG.bootr = 0x%08x\n",
-		(uint32_t)syscfg_base + SYSCFG_BOOTR,
-		mmio_read_32(syscfg_base + SYSCFG_BOOTR));
+	bootr = mmio_read_32(SYSCFG_BASE + SYSCFG_BOOTR) &
+		SYSCFG_BOOTR_BOOT_MASK;
+	mmio_clrsetbits_32(SYSCFG_BASE + SYSCFG_BOOTR, SYSCFG_BOOTR_BOOTPD_MASK,
+			   bootr << SYSCFG_BOOTR_BOOTPD_SHIFT);
 
 	/*
 	 * High Speed Low Voltage Pad mode Enable for SPI, SDMMC, ETH, QSPI
 	 * and TRACE. Needed above ~50MHz and conditioned by AFMUX selection.
 	 * It could be disabled for low frequencies or if AFMUX is selected
-	 * but the function not used, typically for TRACE.
-	 * Otherwise, impact on power consumption.
+	 * but the function is not used, typically for TRACE.
+	 * If high speed low voltage pad mode is node enable, platform will
+	 * over consume.
 	 *
 	 * WARNING:
 	 *   Enabling High Speed mode while VDD > 2.7V
 	 *   with the OTP product_below_2v5 (OTP 18, BIT 13)
-	 *   erroneously set to 1 can damage the IC!
+	 *   erroneously set to 1 can damage the SoC!
 	 *   => TF-A enables the low power mode only if VDD < 2.7V (in DT)
 	 *      but this value needs to be consistent with board design.
 	 */
@@ -107,13 +103,12 @@ void stm32mp1_syscfg_init(void)
 
 	/* Get VDD supply */
 	vdd_voltage = dt_get_pwr_vdd_voltage();
-	VERBOSE("VDD regulator voltage = %d\n", vdd_voltage);
 
 	/* Check if VDD is Low Voltage */
 	if (vdd_voltage == 0U) {
 		WARN("VDD unknown\n");
 	} else if (vdd_voltage < 2700000U) {
-		mmio_write_32(syscfg_base + SYSCFG_IOCTRLSETR,
+		mmio_write_32(SYSCFG_BASE + SYSCFG_IOCTRLSETR,
 			      SYSCFG_IOCTRLSETR_HSLVEN_TRACE |
 			      SYSCFG_IOCTRLSETR_HSLVEN_QUADSPI |
 			      SYSCFG_IOCTRLSETR_HSLVEN_ETH |
@@ -125,21 +120,18 @@ void stm32mp1_syscfg_init(void)
 		}
 	} else {
 		if (product_below_2v5) {
-			ERROR("Product_below_2v5=1: HSLVEN update is destructive, no update as VDD>2.7V\n");
+			ERROR("Product_below_2v5=1:\n");
+			ERROR("\tHSLVEN update is destructive,\n");
+			ERROR("\tno update as VDD > 2.7V\n");
 			panic();
 		}
 	}
-
-	VERBOSE("[0x%x] SYSCFG.IOCTRLSETR = 0x%08x\n",
-		(uint32_t)syscfg_base + SYSCFG_IOCTRLSETR,
-		mmio_read_32(syscfg_base + SYSCFG_IOCTRLSETR));
 
 	stm32mp1_syscfg_enable_io_compensation();
 }
 
 void stm32mp1_syscfg_enable_io_compensation(void)
 {
-	uintptr_t syscfg_base = dt_get_syscfg_base();
 	uint64_t start;
 
 	/*
@@ -147,16 +139,16 @@ void stm32mp1_syscfg_enable_io_compensation(void)
 	 * Warning: need to ensure CSI enabled and ready in clock driver.
 	 * Enable non-secure clock, we assume non-secure is suspended.
 	 */
-	stm32mp1_clk_enable_non_secure(SYSCFG);
+	stm32mp1_clk_force_enable(SYSCFG);
 
-	mmio_setbits_32(syscfg_base + SYSCFG_CMPENSETR,
+	mmio_setbits_32(SYSCFG_BASE + SYSCFG_CMPENSETR,
 			SYSCFG_CMPENSETR_MPU_EN);
 
-	start = timeout_start();
+	start = timeout_init_us(SYSCFG_CMPCR_READY_TIMEOUT_US);
 
-	while ((mmio_read_32(syscfg_base + SYSCFG_CMPCR) &
+	while ((mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) &
 		SYSCFG_CMPCR_READY) == 0U) {
-		if (timeout_elapsed(start, SYSCFG_CMPCR_READY_TIMEOUT_US)) {
+		if (timeout_elapsed(start)) {
 			/*
 			 * Failure on IO compensation enable is not a issue:
 			 * warn only.
@@ -166,17 +158,14 @@ void stm32mp1_syscfg_enable_io_compensation(void)
 		}
 	}
 
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPCR, SYSCFG_CMPCR_SW_CTRL);
-
-	VERBOSE("[0x%x] SYSCFG.cmpcr = 0x%08x\n",
-		(uint32_t)syscfg_base + SYSCFG_CMPCR,
-		mmio_read_32(syscfg_base + SYSCFG_CMPCR));
+	mmio_clrbits_32(SYSCFG_BASE + SYSCFG_CMPCR, SYSCFG_CMPCR_SW_CTRL);
 }
 
 void stm32mp1_syscfg_disable_io_compensation(void)
 {
-	uintptr_t syscfg_base = dt_get_syscfg_base();
 	uint32_t value;
+
+	stm32mp1_clk_force_enable(SYSCFG);
 
 	/*
 	 * Deactivate automatic I/O compensation.
@@ -184,23 +173,18 @@ void stm32mp1_syscfg_disable_io_compensation(void)
 	 * requested for other usages and always OFF in STANDBY.
 	 * Disable non-secure SYSCFG clock, we assume non-secure is suspended.
 	 */
-	value = mmio_read_32(syscfg_base + SYSCFG_CMPCR) >>
+	value = mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) >>
 	      SYSCFG_CMPCR_ANSRC_SHIFT;
 
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPCR,
+	mmio_clrbits_32(SYSCFG_BASE + SYSCFG_CMPCR,
 			SYSCFG_CMPCR_RANSRC | SYSCFG_CMPCR_RAPSRC);
 
-	value = mmio_read_32(syscfg_base + SYSCFG_CMPCR) |
+	value = mmio_read_32(SYSCFG_BASE + SYSCFG_CMPCR) |
 		(value << SYSCFG_CMPCR_RANSRC_SHIFT);
 
-	mmio_write_32(syscfg_base + SYSCFG_CMPCR, value | SYSCFG_CMPCR_SW_CTRL);
+	mmio_write_32(SYSCFG_BASE + SYSCFG_CMPCR, value | SYSCFG_CMPCR_SW_CTRL);
 
-	VERBOSE("[0x%x] SYSCFG.cmpcr = 0x%08x\n",
-		(uint32_t)syscfg_base + SYSCFG_CMPCR,
-		mmio_read_32(syscfg_base + SYSCFG_CMPCR));
+	mmio_setbits_32(SYSCFG_BASE + SYSCFG_CMPENCLRR, SYSCFG_CMPENSETR_MPU_EN);
 
-	mmio_clrbits_32(syscfg_base + SYSCFG_CMPENSETR,
-			SYSCFG_CMPENSETR_MPU_EN);
-
-	stm32mp1_clk_disable_non_secure(SYSCFG);
+	stm32mp1_clk_force_disable(SYSCFG);
 }

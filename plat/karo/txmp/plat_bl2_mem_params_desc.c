@@ -1,13 +1,14 @@
 /*
- * Copyright (c) 2016-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <bl_common.h>
-#include <desc_image_load.h>
-#include <platform.h>
 #include <platform_def.h>
+
+#include <common/bl_common.h>
+#include <common/desc_image_load.h>
+#include <plat/common/platform.h>
 
 /*******************************************************************************
  * Following descriptor provides BL image/ep information that gets used
@@ -37,7 +38,7 @@ static bl_mem_params_node_t bl2_mem_params_descs[] = {
 				      VERSION_2, image_info_t,
 				      IMAGE_ATTRIB_PLAT_SETUP),
 #if defined(AARCH32_SP_OPTEE)
-		/* optee header is loaded is SYSRAM above BL2 */
+		/* optee header is loaded in SYSRAM above BL2 */
 		.image_info.image_base = STM32MP_OPTEE_BASE,
 		.image_info.image_max_size = STM32MP_OPTEE_SIZE,
 #else

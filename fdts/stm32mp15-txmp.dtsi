@@ -3,8 +3,10 @@
  * Copyright (C) Lothar Waßmann <LW@KARO-electronics.de>
  */
 
-#include "stm32mp157c.dtsi"
-#include "stm32mp157cab-pinctrl.dtsi"
+#include "stm32mp157.dtsi"
+#include "stm32mp15xc.dtsi"
+#include "stm32mp15-pinctrl.dtsi"
+#include "stm32mp15xxab-pinctrl.dtsi"
 #include "stm32mp15-karo.dtsi"
 
 &rcc {
@@ -72,7 +74,6 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
-	secure-status = "okay";
 
 	st,pll@0 {
 		reg = <0>;

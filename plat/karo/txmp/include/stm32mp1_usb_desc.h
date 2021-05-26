@@ -1,13 +1,13 @@
 /*
- * Copyright (c) 2015-2017, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef __USBD_DESC_H
-#define __USBD_DESC_H
+#ifndef STM32MP1_USB_DESC_H
+#define STM32MP1_USB_DESC_H
 
-#include <usb_core.h>
+#include <lib/usb/usb_core.h>
 
 /* Max DFU Packet Size = 1024 bytes */
 #define USBD_DFU_XFER_SIZE	1024
@@ -52,4 +52,4 @@
 
 void stm32mp_usb_init_desc(usb_handle_t *pdev);
 
-#endif /* __USBD_DESC_H */
+#endif /* STM32MP1_USB_DESC_H */

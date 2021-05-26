@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,9 +8,10 @@
 #define PLATFORM_DEF_H
 
 #include <arch.h>
-#include <common_def.h>
-#include <gic_common.h>
-#include <utils_def.h>
+#include <drivers/arm/gic_common.h>
+#include <lib/utils_def.h>
+#include <plat/common/common_def.h>
+
 #include "../stm32mp1_def.h"
 
 /*******************************************************************************
@@ -50,6 +51,7 @@
 #define MAX_IO_DEVICES			U(4)
 #define MAX_IO_HANDLES			U(4)
 #define MAX_IO_BLOCK_DEVICES		U(1)
+#define MAX_IO_MTD_DEVICES		U(1)
 
 /*******************************************************************************
  * BL2 specific defines.
@@ -58,8 +60,9 @@
  * Put BL2 just below BL3-1. BL2_BASE is calculated using the current BL2 debug
  * size plus a little space for growth.
  */
-#define BL2_BASE		STM32MP_BL2_BASE
-#define BL2_LIMIT		(STM32MP_BL2_BASE + STM32MP_BL2_SIZE)
+#define BL2_BASE			STM32MP_BL2_BASE
+#define BL2_LIMIT			(STM32MP_BL2_BASE + \
+					 STM32MP_BL2_SIZE)
 
 /*******************************************************************************
  * BL32 specific defines.
@@ -127,7 +130,7 @@
 
 /* Platform IRQ Priority */
 #define STM32MP1_IRQ_RCC_SEC_PRIO	U(0x6)
-#define STM32MP1_IRQ_SEC_SPI_PRIO	U(0x10)
+#define STM32MP_IRQ_SEC_SPI_PRIO	U(0x10)
 
 #define STM32MP1_IRQ_TZC400		U(36)
 #define STM32MP1_IRQ_MCU_SEV		U(176)

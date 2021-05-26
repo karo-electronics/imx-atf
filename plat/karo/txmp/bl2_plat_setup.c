@@ -4,48 +4,60 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
 #include <assert.h>
-#include <bl_common.h>
-#include <boot_api.h>
-#include <bsec.h>
-#include <debug.h>
-#include <delay_timer.h>
-#include <desc_image_load.h>
-#include <dt-bindings/clock/stm32mp1-clks.h>
-#include <dt-bindings/reset/stm32mp1-resets.h>
-#include <errno.h>
-#include <generic_delay_timer.h>
-#include <mmio.h>
-#include <optee_utils.h>
-#include <platform.h>
+#include <string.h>
+
 #include <platform_def.h>
-#include <stm32_console.h>
-#include <stm32_gpio.h>
-#include <stm32_iwdg.h>
-#include <stm32mp_auth.h>
-#include <stm32mp_clkfunc.h>
-#include <stm32mp_common.h>
-#include <stm32mp_dt.h>
-#include <stm32mp_reset.h>
-#include <stm32mp1xx_hal_uart.h>
-#include <stm32mp1_clk.h>
+
+#include <arch_helpers.h>
+#include <common/bl_common.h>
+#include <common/debug.h>
+#include <common/desc_image_load.h>
+#include <drivers/delay_timer.h>
+#include <drivers/generic_delay_timer.h>
+#include <drivers/st/bsec.h>
+#include <drivers/st/stm32_console.h>
+#include <drivers/st/stm32_iwdg.h>
+#include <drivers/st/stm32mp_clkfunc.h>
+#include <drivers/st/stm32mp_pmic.h>
+#include <drivers/st/stm32mp_reset.h>
+#include <drivers/st/stm32mp1_clk.h>
+#include <drivers/st/stm32mp1_pwr.h>
+#include <drivers/st/stm32mp1_ram.h>
+#if STM32MP_UART_PROGRAMMER
+#include <drivers/st/stm32mp1xx_hal_uart.h>
+#endif
+#include <drivers/st/stpmic1.h>
+#include <lib/mmio.h>
+#include <lib/optee_utils.h>
+#include <lib/xlat_tables/xlat_tables_v2.h>
+#include <plat/common/platform.h>
+
+#include <boot_api.h>
 #include <stm32mp1_context.h>
 #include <stm32mp1_dbgmcu.h>
-#include <stm32mp1_private.h>
-#include <stm32mp1_pwr.h>
-#include <stm32mp1_ram.h>
-#include <stm32mp1_rcc.h>
-#include <stm32mp1_shared_resources.h>
-#include <stpmic1.h>
-#include <string.h>
-#include <xlat_tables_v2.h>
 
 #define PWRLP_TEMPO_5_HSI	5
 
+#define TIMEOUT_US_1MS		U(1000)
+
+static const char debug_msg[] = {
+	"***************************************************\n"
+	"** NOTICE   NOTICE   NOTICE   NOTICE   NOTICE    **\n"
+	"**                                               **\n"
+	"** DEBUG ACCESS PORT IS OPEN!                    **\n"
+	"** This boot image is only for debugging purpose **\n"
+	"** and is unsafe for production use.             **\n"
+	"**                                               **\n"
+	"** If you see this message and you are not       **\n"
+	"** debugging report this immediately to your     **\n"
+	"** vendor!                                       **\n"
+	"**                                               **\n"
+	"***************************************************\n"
+};
+
 static struct console_stm32 console;
 static enum boot_device_e boot_device = BOOT_DEVICE_BOARD;
-static struct auth_ops stm32mp_auth_ops;
 static bool wakeup_standby;
 
 static void print_reset_reason(void)
@@ -153,9 +165,10 @@ void bl2_platform_setup(void)
 	 * Map DDR non cacheable during its initialisation to avoid
 	 * speculative loads before accesses are fully setup.
 	 */
-	mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
-				STM32MP_DDR_MAX_SIZE,
-				MT_NON_CACHEABLE | MT_RW | MT_NS);
+	ret = mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
+				      STM32MP_DDR_MAX_SIZE,
+				      MT_NON_CACHEABLE | MT_RW | MT_NS);
+	assert(ret == 0);
 
 	ret = stm32mp1_ddr_probe();
 	if (ret < 0) {
@@ -163,23 +176,29 @@ void bl2_platform_setup(void)
 		panic();
 	}
 
-	mmap_remove_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_MAX_SIZE);
+	ret = mmap_remove_dynamic_region(STM32MP_DDR_BASE,
+					 STM32MP_DDR_MAX_SIZE);
+	assert(ret == 0);
 
 #ifdef AARCH32_SP_OPTEE
 	INFO("BL2 runs OP-TEE setup\n");
 
 	/* Map non secure DDR for BL33 load, now with cacheable attribute */
-	mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
-				dt_get_ddr_size()  - STM32MP_DDR_S_SIZE -
-				STM32MP_DDR_SHMEM_SIZE,
-				MT_MEMORY | MT_RW | MT_NS);
+	ret = mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
+				      dt_get_ddr_size()  - STM32MP_DDR_S_SIZE -
+				      STM32MP_DDR_SHMEM_SIZE,
+				      MT_MEMORY | MT_RW | MT_NS);
+	assert(ret == 0);
 
-	mmap_add_dynamic_region(STM32MP_DDR_BASE + dt_get_ddr_size() -
-				STM32MP_DDR_S_SIZE - STM32MP_DDR_SHMEM_SIZE,
-				STM32MP_DDR_BASE + dt_get_ddr_size() -
-				STM32MP_DDR_S_SIZE - STM32MP_DDR_SHMEM_SIZE,
-				STM32MP_DDR_S_SIZE,
-				MT_MEMORY | MT_RW | MT_SECURE);
+	ret = mmap_add_dynamic_region(STM32MP_DDR_BASE + dt_get_ddr_size() -
+				      STM32MP_DDR_S_SIZE -
+				      STM32MP_DDR_SHMEM_SIZE,
+				      STM32MP_DDR_BASE + dt_get_ddr_size() -
+				      STM32MP_DDR_S_SIZE -
+				      STM32MP_DDR_SHMEM_SIZE,
+				      STM32MP_DDR_S_SIZE,
+				      MT_MEMORY | MT_RW | MT_SECURE);
+	assert(ret == 0);
 
 	/* Initialize tzc400 after DDR initialization */
 	stm32mp1_security_setup();
@@ -187,9 +206,10 @@ void bl2_platform_setup(void)
 	INFO("BL2 runs SP_MIN setup\n");
 
 	/* Map non secure DDR for BL33 load, now with cacheable attribute */
-	mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
-				dt_get_ddr_size(),
-				MT_MEMORY | MT_RW | MT_NS);
+	ret = mmap_add_dynamic_region(STM32MP_DDR_BASE, STM32MP_DDR_BASE,
+				      dt_get_ddr_size(),
+				      MT_MEMORY | MT_RW | MT_NS);
+	assert(ret == 0);
 #endif
 }
 
@@ -213,7 +233,7 @@ static void update_monotonic_counter(void)
 	if ((version + 1U) < BIT(STM32_TF_VERSION)) {
 		uint32_t result;
 
-		/* Need to increment the monotonic counter */
+		/* Need to increment the monotonic counter. */
 		version = BIT(STM32_TF_VERSION) - 1U;
 
 		result = bsec_program_otp(version, otp);
@@ -222,7 +242,7 @@ static void update_monotonic_counter(void)
 			      result);
 			panic();
 		}
-		INFO("Monotonic counter has been incremented value 0x%x\n",
+		INFO("Monotonic counter has been incremented (value 0x%x)\n",
 		     version);
 	}
 }
@@ -231,20 +251,20 @@ static void initialize_clock(void)
 {
 	uint32_t voltage_mv = 0U;
 	uint32_t freq_khz = 0U;
-	int ret;
+	int ret = 0;
 
 	if (wakeup_standby) {
-		stm32_get_pll1_settings_from_context();
+		ret = stm32_get_pll1_settings_from_context();
 	}
 
 	/*
 	 * If no pre-defined PLL1 settings in DT, find the highest frequency
 	 * in the OPP table (in DT, compatible with plaform capabilities, or
-	 * in structure restored in RAM), and set related VDDCORE voltage.
-	 * If PLL1 settings found in DT, we consider VDDCORE voltage in DT is
-	 * consistent with it.
+	 * in structure restored in RAM), and set related CPU supply voltage.
+	 * If PLL1 settings found in DT, we consider CPU supply voltage in DT
+	 * is consistent with it.
 	 */
-	if (!fdt_is_pll1_predefined()) {
+	if ((ret == 0) && !fdt_is_pll1_predefined()) {
 		if (wakeup_standby) {
 			ret = stm32mp1_clk_get_maxfreq_opp(&freq_khz,
 							   &voltage_mv);
@@ -260,6 +280,21 @@ static void initialize_clock(void)
 	if (stm32mp1_clk_init(freq_khz) < 0) {
 		panic();
 	}
+}
+
+static void reset_uart(uint32_t reset)
+{
+	if (stm32mp_reset_assert_to(reset, TIMEOUT_US_1MS)) {
+		panic();
+	}
+
+	udelay(2);
+
+	if (stm32mp_reset_deassert_to(reset, TIMEOUT_US_1MS)) {
+		panic();
+	}
+
+	mdelay(1);
 }
 
 void bl2_el3_plat_arch_setup(void)
@@ -279,12 +314,6 @@ void bl2_el3_plat_arch_setup(void)
 	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE,
 			BL_CODE_END - BL_CODE_BASE,
 			MT_CODE | MT_SECURE);
-
-#if SEPARATE_CODE_AND_RODATA
-	mmap_add_region(BL_RO_DATA_BASE, BL_RO_DATA_BASE,
-			BL_RO_DATA_LIMIT - BL_RO_DATA_BASE,
-			MT_RO_DATA | MT_SECURE);
-#endif
 
 #ifdef AARCH32_SP_OPTEE
 	mmap_add_region(STM32MP_OPTEE_BASE, STM32MP_OPTEE_BASE,
@@ -312,7 +341,8 @@ void bl2_el3_plat_arch_setup(void)
 
 	/* Clear Stop Request bits to correctly manage low-power exit */
 	mmio_write_32(rcc_base + RCC_MP_SREQCLRR,
-		      RCC_MP_SREQCLRR_STPREQ_P0 | RCC_MP_SREQCLRR_STPREQ_P1);
+		      (uint32_t)(RCC_MP_SREQCLRR_STPREQ_P0 |
+				 RCC_MP_SREQCLRR_STPREQ_P1));
 
 	/*
 	 * Disable the backup domain write protection.
@@ -321,9 +351,8 @@ void bl2_el3_plat_arch_setup(void)
 	 */
 	mmio_setbits_32(pwr_base + PWR_CR1, PWR_CR1_DBP);
 
-	while ((mmio_read_32(pwr_base + PWR_CR1) & PWR_CR1_DBP) == 0U) {
+	while (!(mmio_read_32(pwr_base + PWR_CR1) & PWR_CR1_DBP))
 		;
-	}
 
 	/*
 	 * Configure Standby mode available for MCU by default
@@ -337,10 +366,11 @@ void bl2_el3_plat_arch_setup(void)
 
 	/* Reset backup domain on cold boot cases */
 	if ((mmio_read_32(rcc_base + RCC_BDCR) & RCC_BDCR_RTCSRC_MASK) == 0U) {
-		mmio_setbits_32(rcc_base + RCC_BDCR, RCC_BDCR_VSWRST);
+		int loops = 0;
 
+		mmio_setbits_32(rcc_base + RCC_BDCR, RCC_BDCR_VSWRST);
 		while (!(mmio_read_32(rcc_base + RCC_BDCR) & RCC_BDCR_VSWRST)) {
-			;
+			loops++;
 		}
 
 		mmio_clrbits_32(rcc_base + RCC_BDCR, RCC_BDCR_VSWRST);
@@ -374,7 +404,7 @@ void bl2_el3_plat_arch_setup(void)
 
 	generic_delay_timer_init();
 
-#ifdef STM32MP_USB
+#if STM32MP_USB_PROGRAMMER
 	if (boot_context->boot_interface_selected ==
 	    BOOT_API_CTX_BOOT_INTERFACE_SEL_SERIAL_USB) {
 		boot_device = BOOT_DEVICE_USB;
@@ -397,8 +427,6 @@ void bl2_el3_plat_arch_setup(void)
 	}
 
 	initialize_clock();
-
-	stm32mp1_syscfg_init();
 
 	result = dt_get_stdout_uart_info(&dt_uart_info);
 
@@ -429,10 +457,7 @@ void bl2_el3_plat_arch_setup(void)
 
 	stm32mp_clk_enable((unsigned long)dt_uart_info.clock);
 
-	stm32mp_reset_assert((uint32_t)dt_uart_info.reset);
-	udelay(2);
-	stm32mp_reset_deassert((uint32_t)dt_uart_info.reset);
-	mdelay(1);
+	reset_uart((uint32_t)dt_uart_info.reset);
 
 	clk_rate = stm32mp_clk_get_rate((unsigned long)dt_uart_info.clock);
 
@@ -441,46 +466,59 @@ void bl2_el3_plat_arch_setup(void)
 		panic();
 	}
 
+	console_set_scope(&console.console, CONSOLE_FLAG_BOOT |
+			  CONSOLE_FLAG_CRASH | CONSOLE_FLAG_TRANSLATE_CRLF);
+
 	stm32mp_print_cpuinfo();
+
 	board_model = dt_get_board_model();
 	if (board_model != NULL) {
 		NOTICE("Model: %s\n", board_model);
 	}
+
 	stm32mp_print_boardinfo();
 
+#if TRUSTED_BOARD_BOOT
 	if (boot_context->auth_status != BOOT_API_CTX_AUTH_NO) {
-		NOTICE("%s\n", (boot_context->auth_status ==
-				BOOT_API_CTX_AUTH_FAILED) ?
-		       "Boot authentication Failed" :
-		       "Boot authentication Success");
+		NOTICE("Bootrom authentication %s\n",
+		       (boot_context->auth_status == BOOT_API_CTX_AUTH_FAILED) ?
+		       "failed" : "succeeded");
 	}
+#endif
 
 skip_console_init:
+#if !TRUSTED_BOARD_BOOT
+	if (stm32mp_is_closed_device()) {
+		/* Closed chip requires authentication */
+		ERROR("Secured chip requires TRUSTED_BOARD_BOOT\n");
+		panic();
+	}
+#endif
 
-	/* Initialize IWDG Status, no startup */
+	stm32mp1_syscfg_init();
+
 	if (stm32_iwdg_init() < 0) {
 		panic();
 	}
 
-	/* Reload watchdog */
-	stm32_iwdg_refresh(IWDG2_INST);
+	stm32_iwdg_refresh();
 
-	result = stm32mp1_dbgmcu_freeze_iwdg2();
-	if (result != 0) {
-		INFO("IWDG2 freeze error : %i\n", result);
+	if (bsec_read_debug_conf() != 0U) {
+		result = stm32mp1_dbgmcu_freeze_iwdg2();
+		if (result != 0) {
+			INFO("IWDG2 freeze error : %i\n", result);
+		}
+
+		if (stm32mp_is_closed_device()) {
+			NOTICE("\n%s", debug_msg);
+		}
 	}
 
 	if (stm32_save_boot_interface(boot_context->boot_interface_selected,
-				      boot_context->boot_interface_instance)) {
+				      boot_context->boot_interface_instance) !=
+	    0) {
 		ERROR("Cannot save boot interface\n");
 	}
-
-	stm32mp_auth_ops.check_key =
-		boot_context->p_bootrom_ext_service_ecdsa_check_key;
-	stm32mp_auth_ops.verify_signature =
-		boot_context->p_bootrom_ext_service_ecdsa_verify_signature;
-
-	stm32mp_init_auth(&stm32mp_auth_ops);
 
 	stm32mp1_arch_security_setup();
 
@@ -488,7 +526,9 @@ skip_console_init:
 
 	update_monotonic_counter();
 
-	stm32mp_io_setup();
+	if (!wakeup_standby) {
+		stm32mp_io_setup();
+	}
 }
 
 #if defined(AARCH32_SP_OPTEE)
@@ -534,17 +574,22 @@ int bl2_plat_handle_post_image_load(unsigned int image_id)
 
 	assert(bl_mem_params != NULL);
 
+#if TRUSTED_BOARD_BOOT
+	/* Clean header to avoid loaded header reused */
+	stm32mp_delete_loaded_header();
+#endif
+
 	switch (image_id) {
 	case BL32_IMAGE_ID:
 #if defined(AARCH32_SP_OPTEE)
-		pager_mem_params = get_bl_mem_params_node(BL32_EXTRA1_IMAGE_ID);
-		assert(pager_mem_params);
-
-		paged_mem_params = get_bl_mem_params_node(BL32_EXTRA2_IMAGE_ID);
-		assert(paged_mem_params);
-
 		bl_mem_params->ep_info.pc =
 					bl_mem_params->image_info.image_base;
+
+		pager_mem_params = get_bl_mem_params_node(BL32_EXTRA1_IMAGE_ID);
+		assert(pager_mem_params != NULL);
+
+		paged_mem_params = get_bl_mem_params_node(BL32_EXTRA2_IMAGE_ID);
+		assert(paged_mem_params != NULL);
 
 		set_mem_params_info(&bl_mem_params->ep_info,
 				    &pager_mem_params->image_info,
@@ -571,32 +616,18 @@ int bl2_plat_handle_post_image_load(unsigned int image_id)
 	case BL33_IMAGE_ID:
 #ifdef AARCH32_SP_OPTEE
 		bl32_mem_params = get_bl_mem_params_node(BL32_IMAGE_ID);
-		assert(bl32_mem_params);
+		assert(bl32_mem_params != NULL);
 		bl32_mem_params->ep_info.lr_svc = bl_mem_params->ep_info.pc;
-#else
-		/* BL33 expects to receive : TBD */
-		bl_mem_params->ep_info.args.arg0 = 0;
-		bl_mem_params->ep_info.spsr =
-			SPSR_MODE32(MODE32_svc, SPSR_T_ARM, SPSR_E_LITTLE,
-				    DISABLE_ALL_EXCEPTIONS);
 #endif
+
 		flush_dcache_range(bl_mem_params->image_info.image_base,
 				   bl_mem_params->image_info.image_max_size);
 		break;
 
-#ifdef AARCH32_SP_OPTEE
-	case BL32_EXTRA1_IMAGE_ID:
-	case BL32_EXTRA2_IMAGE_ID:
-		clean_dcache_range(bl_mem_params->image_info.image_base,
-				   bl_mem_params->image_info.image_max_size);
-		break;
-#endif
-
 	default:
-		err = -1;
+		/* Do nothing in default case */
 		break;
 	}
 
 	return err;
 }
-

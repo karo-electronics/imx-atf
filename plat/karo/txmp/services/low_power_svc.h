@@ -9,6 +9,6 @@
 
 #include <stdint.h>
 
-uint32_t pm_domain_scv_handler(uint32_t x1, uint32_t x2);
+uint32_t pm_domain_svc_handler(uint32_t x1, uint32_t x2);
 
 #endif /* LOW_POWER_SVC_H */

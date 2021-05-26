@@ -1,86 +1,38 @@
-// SPDX-License-Identifier: BSD-3-Clause
 /*
- * Copyright (c) 2017-2019, STMicroelectronics
+ * Copyright (c) 2017-2020, STMicroelectronics - All Rights Reserved
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch.h>
 #include <assert.h>
-#include <debug.h>
-#include <platform_def.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stm32_gpio.h>
+
+#include <platform_def.h>
+
+#include <arch.h>
+#include <common/debug.h>
+#include <drivers/st/stm32_gpio.h>
+
 #include <stm32mp_dt.h>
 #include <stm32mp_shres_helpers.h>
+#include <stm32mp1_shared_resources.h>
 
 static bool registering_locked;
 static int8_t gpioz_nbpin = -1;
 
 /*
- * Generic clock enable/disable from secure world.
- * Some drivers may use non secure resources in specific execution context:
- * when the other SMP core(s) are offline and non secure is never reached.
- * In such cases, drivers shall enable/disable the HW clock only if it was not
- * left enabled by the non secure world.
- *
- * During driver initializations, before registering_locked is locked, all
- * driver simply enable/disable the clock as if the peripheral was secure.
- */
-void stm32mp_clk_enable(unsigned long id)
-{
-	if (registering_locked) {
-		if (stm32mp1_clock_is_non_secure(id)) {
-			assert(stm32mp1_clk_get_refcount(id) == 0U);
-
-			if (stm32mp1_clk_is_enabled(id)) {
-				return;
-			}
-		}
-	}
-
-	stm32mp1_clk_enable_secure(id);
-}
-
-void stm32mp_clk_disable(unsigned long id)
-{
-	if (registering_locked) {
-		if (stm32mp1_clock_is_non_secure(id)) {
-			if (stm32mp1_clk_get_refcount(id) == 0U) {
-				return;
-			}
-		}
-	}
-
-	stm32mp1_clk_disable_secure(id);
-}
-
-/*
  * Shared peripherals and resources.
  * Defines resource that may be non secure, secure or shared.
  * May be a device, a bus, a clock, a memory.
+ * Shared peripherals and resources registration
  *
- * State default to PERIPH_UNREGISTERED resource is not explicitly
- * set here.
+ * Each resource assignation is stored in a table. The state defaults
+ * to SHRES_UNREGISTERED if the resource is not explicitly assigned.
  *
- * Resource driver not built, the resource defaults
- * to non secure ownership.
- *
- * Each IO of the GPIOZ IO can be secure or non secure.
- * When the GPIO driver is enabled, the GPIOZ bank is fully non secure
- * only if each IO is non secure and the GPIOZ bank is shared if it
- * includes secure and non secure IOs.
- *
- * BKPSRAM is assumed shared.
- * DDR control (DDRC and DDRPHY) is secure.
- * Inits will define the resource state according the device tree
- * and the driver initialization sequences.
- *
- * The platform initialization uses these information to set the ETZPC
- * configuration. Non secure services (as clocks or regulator accesses)
- * rely on these information to drive the related service execution.
+ * Each IO of the GPIOZ IO can be secure or non-secure.
  */
-#define SHRES_NON_SECURE		3
-#define SHRES_SHARED			2
+#define SHRES_NON_SECURE		2
 #define SHRES_SECURE			1
 #define SHRES_UNREGISTERED		0
 
@@ -105,23 +57,8 @@ static const char *shres2str_id_tbl[STM32MP1_SHRES_COUNT] = {
 	[STM32MP1_SHRES_I2C6] = "I2C6",
 	[STM32MP1_SHRES_RTC] = "RTC",
 	[STM32MP1_SHRES_MCU] = "MCU",
-	[STM32MP1_SHRES_HSI] = "HSI",
-	[STM32MP1_SHRES_LSI] = "LSI",
-	[STM32MP1_SHRES_HSE] = "HSE",
-	[STM32MP1_SHRES_LSE] = "LSE",
-	[STM32MP1_SHRES_CSI] = "CSI",
-	[STM32MP1_SHRES_PLL1] = "PLL1",
-	[STM32MP1_SHRES_PLL1_P] = "PLL1_P",
-	[STM32MP1_SHRES_PLL1_Q] = "PLL1_Q",
-	[STM32MP1_SHRES_PLL1_R] = "PLL1_R",
-	[STM32MP1_SHRES_PLL2] = "PLL2",
-	[STM32MP1_SHRES_PLL2_P] = "PLL2_P",
-	[STM32MP1_SHRES_PLL2_Q] = "PLL2_Q",
-	[STM32MP1_SHRES_PLL2_R] = "PLL2_R",
+	[STM32MP1_SHRES_MDMA] = "MDMA",
 	[STM32MP1_SHRES_PLL3] = "PLL3",
-	[STM32MP1_SHRES_PLL3_P] = "PLL3_P",
-	[STM32MP1_SHRES_PLL3_Q] = "PLL3_Q",
-	[STM32MP1_SHRES_PLL3_R] = "PLL3_R",
 };
 
 static const char *shres2str_id(unsigned int id)
@@ -130,10 +67,9 @@ static const char *shres2str_id(unsigned int id)
 }
 
 static const char *shres2str_state_tbl[4] = {
-	[SHRES_SHARED] = "shared",
-	[SHRES_NON_SECURE] = "non secure",
-	[SHRES_SECURE] = "secure",
 	[SHRES_UNREGISTERED] = "unregistered",
+	[SHRES_NON_SECURE] = "non-secure",
+	[SHRES_SECURE] = "secure",
 };
 
 static const char *shres2str_state(unsigned int id)
@@ -154,6 +90,7 @@ struct shres2decprot {
 	}
 
 #define SHRES_INVALID		~0U
+
 static const struct shres2decprot shres2decprot_tbl[] = {
 	SHRES2DECPROT(STM32MP1_SHRES_IWDG1, STM32MP1_ETZPC_IWDG1_ID, "IWDG1"),
 	SHRES2DECPROT(STM32MP1_SHRES_USART1, STM32MP1_ETZPC_USART1_ID, "UART1"),
@@ -180,7 +117,7 @@ static unsigned int decprot2shres(unsigned int decprot_id)
 		}
 	}
 
-	VERBOSE("No shared resource %u", decprot_id);
+	VERBOSE("No shared resource %u\n", decprot_id);
 	return SHRES_INVALID;
 }
 
@@ -194,7 +131,7 @@ static const char *decprot2str(unsigned int decprot_id)
 		}
 	}
 
-	ERROR("Invalid ID %u", decprot_id);
+	ERROR("Invalid ID %u\n", decprot_id);
 	panic();
 }
 
@@ -209,20 +146,10 @@ static unsigned int get_gpioz_nbpin(void)
 	return (unsigned int)gpioz_nbpin;
 }
 
-static bool shareable_resource(unsigned int id)
-{
-	switch (id) {
-	default:
-		/* Currently no shareable resource */
-		return false;
-	}
-}
-
 static void register_periph(unsigned int id, unsigned int state)
 {
-	assert(id < STM32MP1_SHRES_COUNT &&
-	       state > SHRES_UNREGISTERED &&
-	       state <= SHRES_NON_SECURE);
+	assert((id < STM32MP1_SHRES_COUNT) &&
+	       ((state == SHRES_SECURE) || (state == SHRES_NON_SECURE)));
 
 	if (registering_locked) {
 		if (shres_state[id] == state) {
@@ -232,9 +159,8 @@ static void register_periph(unsigned int id, unsigned int state)
 		panic();
 	}
 
-	if ((state == SHRES_SHARED && !shareable_resource(id)) ||
-	    ((shres_state[id] != SHRES_UNREGISTERED) &&
-	     (shres_state[id] != state))) {
+	if ((shres_state[id] != SHRES_UNREGISTERED) &&
+	    (shres_state[id] != state)) {
 		VERBOSE("Cannot change %s from %s to %s\n",
 			shres2str_id(id),
 			shres2str_state(shres_state[id]),
@@ -263,7 +189,7 @@ static void register_periph(unsigned int id, unsigned int state)
 	}
 
 	/* Explore clock tree to lock dependencies */
-	if ((state == SHRES_SECURE) || (state == SHRES_SHARED)) {
+	if (state == SHRES_SECURE) {
 		switch (id) {
 		case STM32MP1_SHRES_GPIOZ(0) ... STM32MP1_SHRES_GPIOZ(7):
 			stm32mp1_register_clock_parents_secure(GPIOZ);
@@ -295,24 +221,6 @@ static void register_periph(unsigned int id, unsigned int state)
 		case STM32MP1_SHRES_RTC:
 			stm32mp1_register_clock_parents_secure(RTC);
 			break;
-		case STM32MP1_SHRES_PLL1_P:
-		case STM32MP1_SHRES_PLL1_Q:
-		case STM32MP1_SHRES_PLL1_R:
-			register_periph(STM32MP1_SHRES_PLL1, SHRES_SECURE);
-			stm32mp1_register_clock_parents_secure(PLL1);
-			break;
-		case STM32MP1_SHRES_PLL2_P:
-		case STM32MP1_SHRES_PLL2_Q:
-		case STM32MP1_SHRES_PLL2_R:
-			register_periph(STM32MP1_SHRES_PLL2, SHRES_SECURE);
-			stm32mp1_register_clock_parents_secure(PLL2);
-			break;
-		case STM32MP1_SHRES_PLL3_P:
-		case STM32MP1_SHRES_PLL3_Q:
-		case STM32MP1_SHRES_PLL3_R:
-			register_periph(STM32MP1_SHRES_PLL3, SHRES_SECURE);
-			stm32mp1_register_clock_parents_secure(PLL3);
-			break;
 		default:
 			/* No expected resource dependency */
 			break;
@@ -325,9 +233,6 @@ static bool stm32mp1_mckprot_resource(unsigned int id)
 	switch (id) {
 	case STM32MP1_SHRES_MCU:
 	case STM32MP1_SHRES_PLL3:
-	case STM32MP1_SHRES_PLL3_P:
-	case STM32MP1_SHRES_PLL3_Q:
-	case STM32MP1_SHRES_PLL3_R:
 		return true;
 	default:
 		return false;
@@ -335,17 +240,12 @@ static bool stm32mp1_mckprot_resource(unsigned int id)
 }
 
 /* Register resource by ID */
-void stm32mp1_register_secure_periph(unsigned int id)
+void stm32mp_register_secure_periph(unsigned int id)
 {
 	register_periph(id, SHRES_SECURE);
 }
 
-void stm32mp1_register_shared_periph(unsigned int id)
-{
-	register_periph(id, SHRES_SHARED);
-}
-
-void stm32mp1_register_non_secure_periph(unsigned int id)
+void stm32mp_register_non_secure_periph(unsigned int id)
 {
 	register_periph(id, SHRES_NON_SECURE);
 }
@@ -403,8 +303,8 @@ static void register_periph_iomem(uintptr_t base, unsigned int state)
 	case UART7_BASE:
 	case UART8_BASE:
 	case IWDG2_BASE:
-		/* Allow drivers to register some non secure resources */
-		VERBOSE("IO for non secure resource 0x%x\n",
+		/* Allow drivers to register some non-secure resources */
+		VERBOSE("IO for non-secure resource 0x%x\n",
 			(unsigned int)base);
 		if (state != SHRES_NON_SECURE) {
 			panic();
@@ -472,13 +372,31 @@ void stm32mp1_register_etzpc_decprot(unsigned int id,
 		panic();
 	}
 
-	id_shres = decprot2shres(id);
-	if (id_shres == SHRES_INVALID) {
-		if (state == SHRES_SECURE) {
+	switch (id) {
+	case STM32MP1_ETZPC_STGENC_ID:
+	case STM32MP1_ETZPC_BKPSRAM_ID:
+		/* We assume these must always be assigned to secure world */
+		if (state != SHRES_SECURE) {
 			panic();
 		}
-	} else {
-		register_periph(id_shres, state);
+		break;
+	case STM32MP1_ETZPC_DDRCTRL_ID:
+	case STM32MP1_ETZPC_DDRPHYC_ID:
+		/* allow write only for secure world */
+		if ((attr != TZPC_DECPROT_S_RW) && (attr != TZPC_DECPROT_NS_R_S_W)) {
+			panic();
+		}
+		break;
+	default:
+		id_shres = decprot2shres(id);
+		if (id_shres == SHRES_INVALID) {
+			if (state == SHRES_SECURE) {
+				panic();
+			}
+		} else {
+			register_periph(id_shres, state);
+		}
+		break;
 	}
 }
 
@@ -488,18 +406,13 @@ static void lock_registering(void)
 	registering_locked = true;
 }
 
-bool stm32mp1_periph_is_shared(unsigned long id)
-{
-	lock_registering();
-
-	return shres_state[id] == SHRES_SHARED;
-}
-
 bool stm32mp1_periph_is_non_secure(unsigned long id)
 {
 	lock_registering();
 
-	return shres_state[id] == SHRES_NON_SECURE;
+	/* Resource not registered are assumed non-secure */
+	return (shres_state[id] == SHRES_NON_SECURE) ||
+	       (shres_state[id] == SHRES_UNREGISTERED);
 }
 
 bool stm32mp1_periph_is_secure(unsigned long id)
@@ -507,13 +420,6 @@ bool stm32mp1_periph_is_secure(unsigned long id)
 	lock_registering();
 
 	return shres_state[id] == SHRES_SECURE;
-}
-
-bool stm32mp1_periph_is_unregistered(unsigned long id)
-{
-	lock_registering();
-
-	return shres_state[id] == SHRES_UNREGISTERED;
 }
 
 bool stm32mp_gpio_bank_is_shared(unsigned int bank)
@@ -528,8 +434,7 @@ bool stm32mp_gpio_bank_is_shared(unsigned int bank)
 	}
 
 	for (i = 0U; i < get_gpioz_nbpin(); i++) {
-		if (stm32mp1_periph_is_non_secure(STM32MP1_SHRES_GPIOZ(i)) ||
-		    stm32mp1_periph_is_unregistered(STM32MP1_SHRES_GPIOZ(i))) {
+		if (!stm32mp1_periph_is_secure(STM32MP1_SHRES_GPIOZ(i))) {
 			non_secure++;
 		}
 	}
@@ -549,8 +454,7 @@ bool stm32mp_gpio_bank_is_non_secure(unsigned int bank)
 	}
 
 	for (i = 0U; i < get_gpioz_nbpin(); i++) {
-		if (stm32mp1_periph_is_non_secure(STM32MP1_SHRES_GPIOZ(i)) ||
-		    stm32mp1_periph_is_unregistered(STM32MP1_SHRES_GPIOZ(i))) {
+		if (!stm32mp1_periph_is_secure(STM32MP1_SHRES_GPIOZ(i))) {
 			non_secure++;
 		}
 	}
@@ -558,7 +462,7 @@ bool stm32mp_gpio_bank_is_non_secure(unsigned int bank)
 	return non_secure == get_gpioz_nbpin();
 }
 
-bool stm32mp_gpio_bank_is_secure(unsigned int bank)
+static bool stm32mp_gpio_bank_is_secure(unsigned int bank)
 {
 	unsigned int secure = 0;
 	unsigned int i;
@@ -578,98 +482,117 @@ bool stm32mp_gpio_bank_is_secure(unsigned int bank)
 	return secure == get_gpioz_nbpin();
 }
 
-bool stm32mp1_clock_is_shareable(unsigned long clock_id)
+CASSERT((CK_HSE == 0) &&
+	((CK_HSE + 1) == CK_CSI) &&
+	((CK_HSE + 2) == CK_LSI) &&
+	((CK_HSE + 3) == CK_LSE) &&
+	((CK_HSE + 4) == CK_HSI) &&
+	((CK_HSE + 5) == CK_HSE_DIV2) &&
+	((PLL1_P + 1) == PLL1_Q) &&
+	((PLL1_P + 2) == PLL1_R) &&
+	((PLL1_P + 3) == PLL2_P) &&
+	((PLL1_P + 4) == PLL2_Q) &&
+	((PLL1_P + 5) == PLL2_R) &&
+	((PLL1_P + 6) == PLL3_P) &&
+	((PLL1_P + 7) == PLL3_Q) &&
+	((PLL1_P + 8) == PLL3_R),
+	assert_clock_id_not_as_expected);
+
+bool stm32mp_nsec_can_access_clock(unsigned long clock_id)
 {
-	switch (clock_id) {
-	case GPIOZ:
-		return get_gpioz_nbpin() > 0;
-	case RTCAPB:
+	enum stm32mp_shres shres_id = STM32MP1_SHRES_COUNT;
+
+	/* Oscillators and PLLs are visible from non-secure world */
+	if ((clock_id <= CK_HSE_DIV2) ||
+	    ((clock_id >= PLL1_P) && (clock_id <= PLL3_R))) {
 		return true;
-	default:
-		return false;
-	}
-}
-
-bool stm32mp1_clock_is_shared(unsigned long clock_id)
-{
-	lock_registering();
-
-	switch (clock_id) {
-	case GPIOZ:
-		if (get_gpioz_nbpin() > 0) {
-			return stm32mp_gpio_bank_is_shared(GPIO_BANK_Z);
-		} else {
-			return false;
-		}
-	case RTCAPB:
-		/* RTCAPB is shared for non secure backup registers */
-		return true;
-	default:
-		return false;
-	}
-}
-
-bool stm32mp1_clock_is_non_secure(unsigned long clock_id)
-{
-	unsigned int shres_id;
-
-	lock_registering();
-
-	if (stm32mp1_clock_is_shared(clock_id)) {
-		return false;
 	}
 
 	switch (clock_id) {
 	case BSEC:
-	case BKPSRAM:
-	case TZPC:
-	case TZC1:
-	case TZC2:
-	case STGEN_K:
-	case DDRC1:
-	case DDRC1LP:
-	case DDRC2:
-	case DDRC2LP:
-	case DDRPHYC:
-	case DDRPHYCLP:
-	case DDRCAPB:
-	case DDRCAPBLP:
-	case AXIDCG:
-	case DDRPHYCAPB:
-	case DDRPHYCAPBLP:
-		return false;
-	case IWDG1:
-		shres_id = STM32MP1_SHRES_IWDG1;
-		break;
-	case USART1_K:
-		shres_id = STM32MP1_SHRES_USART1;
-		break;
+	case CK_AXI:
+	case CK_MPU:
+	case RTCAPB:
+		return true;
+	case GPIOZ:
+		return !stm32mp_gpio_bank_is_secure(GPIO_BANK_Z);
 	case SPI6_K:
 		shres_id = STM32MP1_SHRES_SPI6;
 		break;
 	case I2C4_K:
 		shres_id = STM32MP1_SHRES_I2C4;
 		break;
-	case RNG1_K:
-		shres_id = STM32MP1_SHRES_RNG1;
+	case I2C6_K:
+		shres_id = STM32MP1_SHRES_I2C6;
 		break;
-	case HASH1:
-		shres_id = STM32MP1_SHRES_HASH1;
+	case USART1_K:
+		shres_id = STM32MP1_SHRES_USART1;
+		break;
+	case IWDG1:
+		shres_id = STM32MP1_SHRES_IWDG1;
 		break;
 	case CRYP1:
 		shres_id = STM32MP1_SHRES_CRYP1;
 		break;
-	case I2C6_K:
-		shres_id = STM32MP1_SHRES_I2C6;
+	case HASH1:
+		shres_id = STM32MP1_SHRES_HASH1;
+		break;
+	case RNG1_K:
+		shres_id = STM32MP1_SHRES_RNG1;
 		break;
 	case RTC:
 		shres_id = STM32MP1_SHRES_RTC;
 		break;
+	case CK_MCU:
+		shres_id = STM32MP1_SHRES_MCU;
+		break;
 	default:
-		return true;
+		return false;
 	}
 
-	return stm32mp1_periph_is_non_secure(shres_id);
+	return !stm32mp1_periph_is_secure(shres_id);
+}
+
+bool stm32mp_nsec_can_access_reset(unsigned int reset_id)
+{
+	enum stm32mp_shres shres_id = STM32MP1_SHRES_COUNT;
+
+	switch (reset_id) {
+	case GPIOZ_R:
+		return stm32mp_gpio_bank_is_non_secure(GPIO_BANK_Z);
+	case SPI6_R:
+		shres_id = STM32MP1_SHRES_SPI6;
+		break;
+	case I2C4_R:
+		shres_id = STM32MP1_SHRES_I2C4;
+		break;
+	case I2C6_R:
+		shres_id = STM32MP1_SHRES_I2C6;
+		break;
+	case USART1_R:
+		shres_id = STM32MP1_SHRES_USART1;
+		break;
+	case CRYP1_R:
+		shres_id = STM32MP1_SHRES_CRYP1;
+		break;
+	case HASH1_R:
+		shres_id = STM32MP1_SHRES_HASH1;
+		break;
+	case RNG1_R:
+		shres_id = STM32MP1_SHRES_RNG1;
+		break;
+	case MDMA_R:
+		shres_id = STM32MP1_SHRES_MDMA;
+		break;
+	case MCU_R:
+	case MCU_HOLD_BOOT_R:
+		shres_id = STM32MP1_SHRES_MCU;
+		break;
+	default:
+		return false;
+	}
+
+	return !stm32mp1_periph_is_secure(shres_id);
 }
 
 /* ETZPC configuration at drivers initialization completion */
@@ -680,7 +603,7 @@ static enum etzpc_decprot_attributes decprot_periph_attr(unsigned int id)
 		assert((id - STM32MP1_SHRES_GPIOZ(0)) < get_gpioz_nbpin());
 		return TZPC_DECPROT_NS_RW;
 	default:
-		if (stm32mp1_periph_is_non_secure(id)) {
+		if (!stm32mp1_periph_is_secure(id)) {
 			return TZPC_DECPROT_NS_RW;
 		}
 
@@ -699,7 +622,7 @@ static bool check_decprot(unsigned int id, enum etzpc_decprot_attributes exp)
 	switch (exp) {
 	case TZPC_DECPROT_NS_RW:
 		if (cur == TZPC_DECPROT_S_RW) {
-			WARN("ETZPC: %s (%d) could be non secure\n",
+			INFO("ETZPC: %s (%d) could be non secure\n",
 			     decprot2str(id), id);
 		}
 		return true;
@@ -711,6 +634,7 @@ static bool check_decprot(unsigned int id, enum etzpc_decprot_attributes exp)
 
 	case TZPC_DECPROT_NS_R_S_W:
 	case TZPC_DECPROT_MCU_ISOLATION:
+		break;
 	default:
 		panic();
 	}
@@ -746,9 +670,15 @@ static void check_etzpc_secure_configuration(void)
 	error |= !check_decprot(STM32MP1_ETZPC_CRYP1_ID,
 				decprot_periph_attr(STM32MP1_SHRES_CRYP1));
 
-	error |= !check_decprot(STM32MP1_ETZPC_DDRCTRL_ID, TZPC_DECPROT_S_RW);
+	error |= !((check_decprot(STM32MP1_ETZPC_DDRCTRL_ID,
+				 TZPC_DECPROT_NS_R_S_W)) ||
+		   (check_decprot(STM32MP1_ETZPC_DDRCTRL_ID,
+				  TZPC_DECPROT_S_RW)));
 
-	error |= !check_decprot(STM32MP1_ETZPC_DDRPHYC_ID, TZPC_DECPROT_S_RW);
+	error |= !((check_decprot(STM32MP1_ETZPC_DDRPHYC_ID,
+				 TZPC_DECPROT_NS_R_S_W)) ||
+		   (check_decprot(STM32MP1_ETZPC_DDRPHYC_ID,
+				  TZPC_DECPROT_S_RW)));
 
 	error |= !check_decprot(STM32MP1_ETZPC_I2C6_ID,
 				decprot_periph_attr(STM32MP1_SHRES_I2C6));
@@ -766,8 +696,7 @@ static void check_rcc_secure_configuration(void)
 	bool secure = stm32mp1_rcc_is_secure();
 
 	for (n = 0; n < ARRAY_SIZE(shres_state); n++) {
-		if  ((shres_state[n] == SHRES_SECURE) ||
-		     (shres_state[n] == SHRES_SHARED)) {
+		if  (shres_state[n] == SHRES_SECURE) {
 			if ((stm32mp1_mckprot_resource(n) && (!mckprot)) ||
 			    !secure) {
 				ERROR("RCC %s MCKPROT %s and %s (%u) secure\n",
@@ -789,40 +718,37 @@ static void check_gpio_secure_configuration(void)
 	uint32_t pin;
 
 	for (pin = 0U; pin < get_gpioz_nbpin(); pin++) {
-		bool secure =
-			stm32mp1_periph_is_secure(STM32MP1_SHRES_GPIOZ(pin));
+		unsigned int id = STM32MP1_SHRES_GPIOZ(pin);
+		bool secure = stm32mp1_periph_is_secure(id);
 
 		set_gpio_secure_cfg(GPIO_BANK_Z, pin, secure);
 	}
 }
 
-void stm32mp1_driver_init_late(void)
+void stm32mp_lock_periph_registering(void)
 {
 	uint32_t __unused id;
 
 	registering_locked = true;
 
-#if LOG_LEVEL >= LOG_LEVEL_INFO
 	for (id = 0; id < STM32MP1_SHRES_COUNT; id++) {
-		uint8_t *state = &shres_state[id];
+		uint8_t state = shres_state[id];
 
-		/* Display only the secure and shared resources */
-		if ((*state == SHRES_NON_SECURE) ||
-		    ((*state == SHRES_UNREGISTERED))) {
-			continue;
+		assert((state == SHRES_SECURE) ||
+		       (state == SHRES_NON_SECURE) ||
+		       (state == SHRES_UNREGISTERED));
+
+		if (state == SHRES_SECURE) {
+			INFO("stm32mp %s (%u): %s\n",
+			     shres2str_id(id), id,
+			     state == SHRES_SECURE ? "Secure" :
+			     state == SHRES_NON_SECURE ? "Non-secure" :
+			     state == SHRES_UNREGISTERED ? "Unregistered" :
+			     "<Invalid>");
 		}
-
-		INFO("stm32mp %s (%u): %s\n",
-		     shres2str_id(id), id,
-		     *state == SHRES_SECURE ? "Secure only" :
-		     *state == SHRES_SHARED ? "Shared" :
-		     *state == SHRES_NON_SECURE ? "Non secure" :
-		     *state == SHRES_UNREGISTERED ? "Unregistered" :
-		     "<Invalid>");
 	}
-#endif
 
-	stm32mp1_update_earlyboot_clocks_state();
+	stm32mp1_dump_clocks_state();
 
 	check_rcc_secure_configuration();
 	check_etzpc_secure_configuration();

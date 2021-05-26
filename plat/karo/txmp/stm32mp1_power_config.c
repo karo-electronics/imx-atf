@@ -5,19 +5,24 @@
  */
 
 #include <assert.h>
-#include <debug.h>
-#include <dt-bindings/power/stm32mp1-power.h>
 #include <errno.h>
-#include <libfdt.h>
 #include <limits.h>
+
+#include <libfdt.h>
+
+#include <common/debug.h>
+#include <dt-bindings/power/stm32mp1-power.h>
+
 #include <stm32mp_dt.h>
 #include <stm32mp1_power_config.h>
 
 #define SYSTEM_SUSPEND_SUPPORTED_MODES	"system_suspend_supported_soc_modes"
 #define SYSTEM_OFF_MODE			"system_off_soc_mode"
+#define RETRAM_ENABLED			"st,retram-enabled-in-standby-ddr-sr"
 
 static uint32_t deepest_system_suspend_mode;
 static uint32_t system_off_mode;
+static bool retram_enabled;
 static uint8_t stm32mp1_supported_soc_modes[STM32_PM_MAX_SOC_MODE];
 
 static int dt_get_pwr_node(void)
@@ -78,7 +83,6 @@ static int dt_fill_lp_state(uint32_t *lp_state_config, const char *lp_state)
 
 	pwr_node = dt_get_pwr_node();
 	if (pwr_node < 0) {
-		ERROR("compatible %s not found\n", DT_PWR_COMPAT);
 		return -FDT_ERR_NOTFOUND;
 	}
 
@@ -94,11 +98,39 @@ static int dt_fill_lp_state(uint32_t *lp_state_config, const char *lp_state)
 	return 0;
 }
 
+static int dt_fill_retram_enabled(void)
+{
+	int pwr_node;
+	void *fdt;
+
+	if (fdt_get_address(&fdt) == 0) {
+		return -ENOENT;
+	}
+
+	pwr_node = dt_get_pwr_node();
+	if (pwr_node < 0) {
+		return -ENOENT;
+	}
+
+	if (fdt_getprop(fdt, pwr_node, RETRAM_ENABLED, NULL) == NULL) {
+		retram_enabled = false;
+	} else {
+		retram_enabled = true;
+	}
+
+	return 0;
+}
+
 void stm32mp1_init_lp_states(void)
 {
 	if (dt_fill_lp_state(&system_off_mode, SYSTEM_OFF_MODE) < 0) {
 		ERROR("Node %s not found\n", SYSTEM_OFF_MODE);
-		//panic();
+		panic();
+	}
+
+	if (dt_fill_retram_enabled() < 0) {
+		ERROR("could not configure retram state\n");
+		panic();
 	}
 }
 
@@ -133,9 +165,19 @@ int stm32mp1_set_pm_domain_state(enum stm32mp1_pm_domain domain, bool status)
 	return 0;
 }
 
-static bool is_supported_mode(uint32_t soc_mode)
+static bool is_allowed_mode(uint32_t soc_mode)
 {
 	assert(soc_mode < ARRAY_SIZE(stm32mp1_supported_soc_modes));
+
+	if ((soc_mode == STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR) &&
+	    !stm32mp1_get_pm_domain_state(STM32MP1_PD_CORE_RET)) {
+		return false;
+	}
+
+	if ((soc_mode == STM32_PM_CSTOP_ALLOW_LPLV_STOP) &&
+	    !stm32mp1_get_pm_domain_state(STM32MP1_PD_CORE)) {
+		return false;
+	}
 
 	return stm32mp1_supported_soc_modes[soc_mode] == 1U;
 }
@@ -150,26 +192,8 @@ uint32_t stm32mp1_get_lp_soc_mode(uint32_t psci_mode)
 
 	mode = deepest_system_suspend_mode;
 
-	if ((mode == STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR) &&
-	    ((!stm32mp1_get_pm_domain_state(STM32MP1_PD_CORE_RET)) ||
-	     (!is_supported_mode(mode)))) {
-		mode = STM32_PM_CSTOP_ALLOW_LPLV_STOP;
-	}
-
-	if ((mode == STM32_PM_CSTOP_ALLOW_LPLV_STOP) &&
-	    ((!stm32mp1_get_pm_domain_state(STM32MP1_PD_CORE)) ||
-	     (!is_supported_mode(mode)))) {
-		mode = STM32_PM_CSTOP_ALLOW_LP_STOP;
-	}
-
-	if ((mode == STM32_PM_CSTOP_ALLOW_LP_STOP) &&
-	    (!is_supported_mode(mode))) {
-		mode = STM32_PM_CSTOP_ALLOW_STOP;
-	}
-
-	if ((mode == STM32_PM_CSTOP_ALLOW_STOP) &&
-	    (!is_supported_mode(mode))) {
-		mode = STM32_PM_CSLEEP_RUN;
+	while ((mode > STM32_PM_CSLEEP_RUN) && !is_allowed_mode(mode)) {
+		mode--;
 	}
 
 	return mode;
@@ -190,4 +214,9 @@ int stm32mp1_set_lp_deepest_soc_mode(uint32_t psci_mode, uint32_t soc_mode)
 	}
 
 	return 0;
+}
+
+bool stm32mp1_get_retram_enabled(void)
+{
+	return retram_enabled;
 }

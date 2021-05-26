@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2016-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,9 +7,7 @@
 #ifndef BSEC_SVC_H
 #define BSEC_SVC_H
 
-#include <arch.h>
-#include <bl_common.h>
-#include <bsec.h>
+#include <stdint.h>
 
 /* version of this service */
 /* must be increase at each structure modification */

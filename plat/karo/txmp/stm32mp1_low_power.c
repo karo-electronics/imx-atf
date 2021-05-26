@@ -4,35 +4,41 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
 #include <assert.h>
-#include <boot_api.h>
-#include <debug.h>
-#include <delay_timer.h>
+
+#include <libfdt.h>
+
+#include <arch_helpers.h>
+#include <common/debug.h>
+#include <drivers/arm/gic_common.h>
+#include <drivers/arm/gicv2.h>
+#include <drivers/delay_timer.h>
+#include <drivers/st/stm32_iwdg.h>
+#include <drivers/st/stm32_rtc.h>
+#include <drivers/st/stm32mp_clkfunc.h>
+#include <drivers/st/stm32mp1_ddr_helpers.h>
+#include <drivers/st/stm32mp1_pwr.h>
+#include <drivers/st/stm32mp1_rcc.h>
 #include <dt-bindings/clock/stm32mp1-clks.h>
 #include <dt-bindings/power/stm32mp1-power.h>
-#include <gic_common.h>
-#include <gicv2.h>
-#include <libfdt.h>
-#include <mmio.h>
-#include <platform.h>
-#include <stm32_iwdg.h>
-#include <stm32_rtc.h>
+#include <lib/mmio.h>
+#include <lib/psci/psci.h>
+#include <lib/spinlock.h>
+#include <plat/common/platform.h>
+
+#include <boot_api.h>
 #include <stm32mp_common.h>
 #include <stm32mp_dt.h>
-#include <stm32mp1_clk.h>
 #include <stm32mp1_context.h>
-#include <stm32mp1_ddr_helpers.h>
 #include <stm32mp1_low_power.h>
+#include <stm32mp1_power_config.h>
 #include <stm32mp1_private.h>
-#include <stm32mp1_pwr.h>
-#include <stm32mp1_rcc.h>
-#include <stm32mp1_shared_resources.h>
 
 static unsigned int gicc_pmr;
 static struct stm32_rtc_calendar sleep_time;
 static bool enter_cstop_done;
-static uint8_t int_stack[STM32MP_INT_STACK_SIZE];
+static uint32_t int_stack[STM32MP_INT_STACK_SIZE];
+static unsigned long long stgen_cnt;
 
 extern void wfi_svc_int_enable(uintptr_t stack_addr);
 
@@ -87,6 +93,16 @@ static const struct pwr_lp_config config_pwr[STM32_PM_MAX_SOC_MODE] = {
 
 #define GICC_PMR_PRIORITY_8	U(0x8)
 
+enum {
+	STATE_NONE = 0,
+	STATE_AUTOSTOP_ENTRY,
+	STATE_AUTOSTOP_EXIT,
+};
+
+static struct spinlock lp_lock;
+static volatile int cpu0_state = STATE_NONE;
+static volatile int cpu1_state = STATE_NONE;
+
 /*
  * stm32_enter_cstop - Prepare CSTOP mode
  *
@@ -122,8 +138,6 @@ static void enter_cstop(uint32_t mode, uint32_t nsec_addr)
 		stm32_save_ddr_training_area();
 	}
 
-	stm32mp1_clk_mpu_suspend();
-
 	/* Clear RCC interrupt before enabling it */
 	mmio_setbits_32(rcc_base + RCC_MP_CIFR, RCC_MP_CIFR_WKUPF);
 
@@ -143,7 +157,7 @@ static void enter_cstop(uint32_t mode, uint32_t nsec_addr)
 	mmio_setbits_32(rcc_base + RCC_MP_SREQSETR,
 			RCC_MP_SREQSETR_STPREQ_P0 | RCC_MP_SREQSETR_STPREQ_P1);
 
-	stm32_iwdg_refresh(IWDG2_INST);
+	stm32_iwdg_refresh();
 
 	gicc_pmr = plat_ic_set_priority_mask(GICC_PMR_PRIORITY_8);
 
@@ -152,13 +166,18 @@ static void enter_cstop(uint32_t mode, uint32_t nsec_addr)
 	 * This is also the procedure awaited when switching off power supply.
 	 */
 	if (ddr_standby_sr_entry(&zq0cr0_zdata) != 0) {
-		return;
+		panic();
 	}
 
 	stm32mp_clk_enable(RTCAPB);
 
 	mmio_write_32(bkpr_core1_addr, 0);
 	mmio_write_32(bkpr_core1_magic, 0);
+
+	stm32mp1_clock_stopmode_save();
+
+	stm32_rtc_get_calendar(&sleep_time);
+	stgen_cnt = stm32mp_stgen_get_counter();
 
 	if (mode == STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR) {
 		/*
@@ -169,22 +188,28 @@ static void enter_cstop(uint32_t mode, uint32_t nsec_addr)
 		mmio_write_32(bkpr_core1_magic,
 			      BOOT_API_A7_CORE0_MAGIC_NUMBER);
 
-		if (stm32_save_context(zq0cr0_zdata) != 0) {
+		if (stm32_save_context(zq0cr0_zdata, &sleep_time,
+				       stgen_cnt) != 0) {
 			panic();
 		}
 
-		/* Keep retention and backup RAM content in standby */
-		mmio_setbits_32(pwr_base + PWR_CR2, PWR_CR2_BREN |
-				PWR_CR2_RREN);
+		if (stm32mp1_get_retram_enabled()) {
+			mmio_setbits_32(pwr_base + PWR_CR2, PWR_CR2_RREN);
+			while ((mmio_read_32(pwr_base + PWR_CR2) &
+				PWR_CR2_RRRDY) == 0U) {
+				;
+			}
+		}
+
+		/* Keep backup RAM content in standby */
+		mmio_setbits_32(pwr_base + PWR_CR2, PWR_CR2_BREN);
 		while ((mmio_read_32(pwr_base + PWR_CR2) &
-			(PWR_CR2_BRRDY | PWR_CR2_RRRDY)) == 0U) {
+			PWR_CR2_BRRDY) == 0U) {
 			;
 		}
 	}
 
 	stm32mp_clk_disable(RTCAPB);
-
-	stm32_rtc_get_calendar(&sleep_time);
 
 	enter_cstop_done = true;
 }
@@ -205,13 +230,11 @@ void stm32_exit_cstop(void)
 
 	enter_cstop_done = false;
 
-	stm32mp1_clk_mpu_resume();
-
 	if (ddr_sw_self_refresh_exit() != 0) {
 		panic();
 	}
 
-	/* Restore Self-Refresh mode saved in enter_cstop() */
+	/* Switch to memorized Self-Refresh mode */
 	ddr_restore_sr_mode();
 
 	plat_ic_set_priority_mask(gicc_pmr);
@@ -234,11 +257,101 @@ void stm32_exit_cstop(void)
 
 	stdby_time_in_ms = stm32_rtc_diff_calendar(&current_calendar,
 						   &sleep_time);
-
-	stm32mp1_stgen_restore_counter(stm32_get_stgen_from_context(),
-				       stdby_time_in_ms);
+	stm32mp_stgen_restore_counter(stgen_cnt, stdby_time_in_ms);
 
 	stm32mp1_syscfg_enable_io_compensation();
+
+	if (stm32mp1_clock_stopmode_resume() != 0) {
+		panic();
+	}
+}
+
+static int get_locked(volatile int *state)
+{
+	volatile int val;
+
+	spin_lock(&lp_lock);
+	val = *state;
+	spin_unlock(&lp_lock);
+
+	return val;
+}
+
+static void set_locked(volatile int *state, int val)
+{
+	spin_lock(&lp_lock);
+	*state = val;
+	spin_unlock(&lp_lock);
+}
+
+static void smp_synchro(int state, bool wake_up)
+{
+	/* if the other CPU is stopped, no need to synchronize */
+	if (psci_is_last_on_cpu() == 1U) {
+		return;
+	}
+
+	if (plat_my_core_pos() == STM32MP_PRIMARY_CPU) {
+		set_locked(&cpu0_state, state);
+
+		while (get_locked(&cpu1_state) != state) {
+			if (wake_up) {
+				/* wakeup secondary CPU */
+				gicv2_raise_sgi(ARM_IRQ_SEC_SGI_6,
+						STM32MP_SECONDARY_CPU);
+				udelay(10);
+			}
+		};
+	} else {
+		while (get_locked(&cpu0_state) != state) {
+			if (wake_up) {
+				/* wakeup primary CPU */
+				gicv2_raise_sgi(ARM_IRQ_SEC_SGI_6,
+						STM32MP_PRIMARY_CPU);
+				udelay(10);
+			}
+		};
+
+		set_locked(&cpu1_state, state);
+	}
+}
+
+static void stm32_auto_stop_cpu0(void)
+{
+	smp_synchro(STATE_AUTOSTOP_ENTRY, false);
+
+	enter_cstop(STM32_PM_CSTOP_ALLOW_LP_STOP, 0);
+
+	stm32_pwr_down_wfi();
+
+	stm32_exit_cstop();
+
+	smp_synchro(STATE_AUTOSTOP_EXIT, true);
+}
+
+static void stm32_auto_stop_cpu1(void)
+{
+	unsigned int gicc_pmr_cpu1;
+
+	/* clear cache before the DDR is being disabled by cpu0 */
+	dcsw_op_all(DC_OP_CISW);
+
+	smp_synchro(STATE_AUTOSTOP_ENTRY, false);
+
+	gicc_pmr_cpu1 = plat_ic_set_priority_mask(GICC_PMR_PRIORITY_8);
+	wfi();
+	plat_ic_set_priority_mask(gicc_pmr_cpu1);
+
+	smp_synchro(STATE_AUTOSTOP_EXIT, true);
+}
+
+void stm32_auto_stop(void)
+{
+	if (plat_my_core_pos() == STM32MP_PRIMARY_CPU) {
+		stm32_auto_stop_cpu0();
+	} else {
+		stm32_auto_stop_cpu1();
+	}
 }
 
 static void enter_shutdown(void)
@@ -294,6 +407,6 @@ void stm32_pwr_down_wfi(void)
 			gicv2_end_of_interrupt(interrupt);
 		}
 
-		stm32_iwdg_refresh(IWDG2_INST);
+		stm32_iwdg_refresh();
 	}
 }

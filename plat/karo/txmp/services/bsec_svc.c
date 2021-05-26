@@ -4,17 +4,23 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#include <assert.h>
+
+#include <platform_def.h>
+
 #include <arch.h>
 #include <arch_helpers.h>
-#include <assert.h>
+#include <common/debug.h>
+#include <common/runtime_svc.h>
+#include <drivers/st/bsec.h>
+#include <drivers/st/bsec2_reg.h>
+#include <drivers/st/stm32mp1_ddr_helpers.h>
+#include <lib/mmio.h>
+#include <lib/xlat_tables/xlat_tables_v2.h>
+#include <services/std_svc.h>
+
 #include <boot_api.h>
-#include <debug.h>
-#include <mmio.h>
-#include <platform_def.h>
-#include <runtime_svc.h>
-#include <std_svc.h>
 #include <stm32mp1_dbgmcu.h>
-#include <stm32mp1_ddr_helpers.h>
 #include <stm32mp1_smc.h>
 
 #include "bsec_svc.h"
@@ -87,7 +93,7 @@ static enum bsec_ssp_status bsec_check_ssp(uint32_t otp, uint32_t update)
 	return BSEC_NO_SSP;
 }
 
-#if STM32MP_USB || STM32MP_UART_PROGRAMMER
+#if STM32MP_USB_PROGRAMMER || STM32MP_UART_PROGRAMMER
 static uint32_t bsec_read_all_bsec(struct otp_exchange *exchange)
 {
 	uint32_t i;
@@ -376,24 +382,53 @@ static uint32_t bsec_write_all_bsec(struct otp_exchange *exchange,
 
 	return BSEC_OK;
 }
-#endif /* STM32MP_USB || STM32MP_UART_PROGRAMMER */
+#endif /* STM32MP_USB_PROGRAMMER || STM32MP_UART_PROGRAMMER */
 
 uint32_t bsec_main(uint32_t x1, uint32_t x2, uint32_t x3,
 		   uint32_t *ret_otp_value)
 {
 	uint32_t result;
 	uint32_t tmp_data = 0U;
+	struct otp_exchange *otp_exch __unused;
+	uintptr_t map_begin __unused;
+	size_t map_size __unused = PAGE_SIZE;
+	int ret __unused;
 
 	if ((x1 != STM32_SMC_READ_ALL) && (x1 != STM32_SMC_WRITE_ALL) &&
 	    (bsec_check_nsec_access_rights(x2) != BSEC_OK)) {
 		return STM32_SMC_INVALID_PARAMS;
 	}
 
-#if STM32MP_USB || STM32MP_UART_PROGRAMMER
-	if (((x1 == STM32_SMC_READ_ALL) || (x1 == STM32_SMC_WRITE_ALL)) &&
-	    (!ddr_is_nonsecured_area((uintptr_t)x2,
-				     sizeof(struct otp_exchange)))) {
-		return STM32_SMC_INVALID_PARAMS;
+#if STM32MP_USB_PROGRAMMER || STM32MP_UART_PROGRAMMER
+	otp_exch = NULL;
+	map_begin = 0U;
+
+	if ((x1 == STM32_SMC_READ_ALL) || (x1 == STM32_SMC_WRITE_ALL)) {
+		map_begin = round_down(x2, PAGE_SIZE);
+
+		if (round_down(x2 + sizeof(struct otp_exchange), PAGE_SIZE) !=
+		    map_begin) {
+			/*
+			 * Buffer end is in the next page, 2 pages need to be
+			 * mapped.
+			 */
+			map_size += PAGE_SIZE;
+		}
+
+		ret = mmap_add_dynamic_region(map_begin,
+					      map_begin,
+					      map_size,
+					      MT_MEMORY | MT_RW | MT_NS);
+		assert(ret == 0);
+
+		if (!ddr_is_nonsecured_area(map_begin, map_size)) {
+			ret = mmap_remove_dynamic_region(map_begin, map_size);
+			assert(ret == 0);
+
+			return STM32_SMC_INVALID_PARAMS;
+		}
+
+		otp_exch = (struct otp_exchange *)(uintptr_t)x2;
 	}
 #endif
 
@@ -440,13 +475,12 @@ uint32_t bsec_main(uint32_t x1, uint32_t x2, uint32_t x3,
 
 		result = bsec_write_otp(tmp_data, x2);
 		break;
-#if STM32MP_USB || STM32MP_UART_PROGRAMMER
+#if STM32MP_USB_PROGRAMMER || STM32MP_UART_PROGRAMMER
 	case STM32_SMC_READ_ALL:
-		result = bsec_read_all_bsec((struct otp_exchange *)x2);
+		result = bsec_read_all_bsec(otp_exch);
 		break;
 	case STM32_SMC_WRITE_ALL:
-		result = bsec_write_all_bsec((struct otp_exchange *)x2,
-					     ret_otp_value);
+		result = bsec_write_all_bsec(otp_exch, ret_otp_value);
 		break;
 #endif
 	case STM32_SMC_WRLOCK_OTP:
@@ -455,6 +489,13 @@ uint32_t bsec_main(uint32_t x1, uint32_t x2, uint32_t x3,
 	default:
 		return STM32_SMC_INVALID_PARAMS;
 	}
+
+#if STM32MP_USB_PROGRAMMER || STM32MP_UART_PROGRAMMER
+	if ((x1 == STM32_SMC_READ_ALL) || (x1 == STM32_SMC_WRITE_ALL)) {
+		ret = mmap_remove_dynamic_region(map_begin, map_size);
+		assert(ret == 0);
+	}
+#endif
 
 	return (result == BSEC_OK) ? STM32_SMC_OK : STM32_SMC_FAILED;
 }

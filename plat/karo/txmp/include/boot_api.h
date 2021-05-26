@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, STMicroelectronics - All Rights Reserved
+ * Copyright (c) 2017-2019, STMicroelectronics - All Rights Reserved
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -97,12 +97,12 @@ BOOT_API_CTX_STBY_EXIT_STATUS_WKUP_MCU_ONLY_MCU_ABT_SEC_PERIMETER_ISSUE	0x07
 /*
  * Possible value of boot context field 'auth_status'
  */
- /* No authentication done */
-#define BOOT_API_CTX_AUTH_NO					0x00
- /* Authentication done and failed */
-#define BOOT_API_CTX_AUTH_FAILED				0x01
- /* Authentication done and success */
-#define BOOT_API_CTX_AUTH_SUCCESS				0x02
+/* No authentication done */
+#define BOOT_API_CTX_AUTH_NO					0x0U
+/* Authentication done and failed */
+#define BOOT_API_CTX_AUTH_FAILED				0x1U
+/* Authentication done and succeeded */
+#define BOOT_API_CTX_AUTH_SUCCESS				0x2U
 
 /*
  * Possible value of boot context field 'boot_interface_sel'
@@ -117,19 +117,19 @@ BOOT_API_CTX_STBY_EXIT_STATUS_WKUP_MCU_ONLY_MCU_ABT_SEC_PERIMETER_ISSUE	0x07
 /* Boot occurred on EMMC */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_FLASH_EMMC		0x2U
 
-/* boot occurred on NAND FMC */
+/* Boot occurred on FMC */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_FLASH_NAND_FMC		0x3U
 
-/* boot occurred on QSPI NOR */
+/* Boot occurred on QSPI NOR */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_FLASH_NOR_QSPI		0x4U
 
-/* boot occurred on UART  */
+/* Boot occurred on UART  */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_SERIAL_UART		0x5U
 
-/* boot occurred on USB */
+/* Boot occurred on USB */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_SERIAL_USB		0x6U
 
-/* boot occurred on NAND QSPI */
+/* Boot occurred on QSPI NAND */
 #define BOOT_API_CTX_BOOT_INTERFACE_SEL_FLASH_NAND_QSPI		0x7U
 
 /**
@@ -318,6 +318,8 @@ BOOT_API_MCIC_RETRAM_REGION_TO_HASH_IN_BYTES_TAMP_BCK_REG_IDX		23
 /* Closed = OTP_CFG0[6] */
 #define BOOT_API_OTP_MODE_CLOSED_BIT_POS			6
 
+#define BOOT_API_RETURN_OK					0x77U
+
 /* Mapping of OTP Word and OTP bits managing SSP and useful to FSBL-SSP */
 /* OTP_CFG8 */
 #define BOOT_API_OTP_SSP_WORD_NB				8U
@@ -385,15 +387,7 @@ typedef struct {
 	 */
 	uint16_t boot_interface_selected;
 	uint16_t boot_interface_instance;
-	uint32_t reserved1;
-	uint32_t nand_data_width;
-	uint32_t nand_block_size;
-	uint32_t nand_page_size;
-	uint32_t reserved2;
-	uint32_t nand_ecc_bits;
-	uint32_t nand_block_nb;
-	uint32_t reserved3[4];
-	uint32_t nor_isdual;
+	uint32_t reserved1[12];
 	uint32_t usb_context;
 	uint32_t otp_afmux_values[3];
 	uint32_t reserved[2];
@@ -416,101 +410,25 @@ typedef struct {
 	 * depending on encountered situation
 	 */
 	uint32_t cstby_exit_status;
-	/*
-	 * Returned authentication status : take values from defines
-	 * BOOT_API_CTX_AUTH_XXX above
-	 */
 	uint32_t auth_status;
 
 	/*
-	 *******************************************************
 	 * Pointers to bootROM External Secure Services
-	 * External Secure Services offered by bootROM
 	 * - ECDSA check key
 	 * - ECDSA verify signature
 	 * - ECDSA verify signature and go
-	 *******************************************************
 	 */
-	/*
-	 * Check if hash of p_pub_key_in is equal to hash by SHA-256
-	 * of OEM public key from OTP
-	 *
-	 *	    If no: => infinite loop in bootROM : boot failed
-	 *
-	 *          else: copy p_pub_key_in to p_pub_key_out if
-	 *          p_pub_key_out not NULL.
-	 *                and return to caller.
-	 *
-	 * @param[in]       p_pub_key_in    points to an ECDSA public key :
-	 *                  Very Important : address alignment constraint :
-	 *                  This address should be multiple of 4 bytes only.
-	 * @param[in/out]   p_pub_key_out   points to area where to store copy
-	 *                               of public key.
-	 *                  Very Important : address alignment constraint :
-	 *                  This address should be multiple of 4 bytes only.
-	 * @retval  STD_OK (0x77) or STD_NOT_OK (0x66)
-	 */
-	uint32_t (*p_bootrom_ext_service_ecdsa_check_key)
-		(uint8_t *p_pub_key_in,
-		 uint8_t *p_pub_key_out);
-	/*
-	 * verify ECDSA signature
-	 *
-	 *          Decrypt EDCSA signature from 'p_signature'
-	 *          using public key passed in parameter 'p_pub_key_in'
-	 *          Then compare it to hash from 'p_hash_in' (SHA-256)
-	 *
-	 *          If no match: => infinite loop in bootROM
-	 *
-	 *          else: return to caller
-	 *
-	 * @param[in]    p_hash_in : points on hash in (SHA-256)
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    p_pub_key_in : points to an ECDSA public key
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    p_signature : points to an EDCSA signature.
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    ecc_algo : Ecc algorithm to be used P256 NIST or
-	 *                         Brain_pool 256.
-	 *
-	 * @retval  STD_OK (0x77) or STD_NOT_OK (0x66)
-	 */
-	uint32_t (*p_bootrom_ext_service_ecdsa_verify_signature)
-		(uint8_t *p_hash_in, uint8_t *p_pub_key_in,
-		 uint8_t *p_signature, uint32_t ecc_algo);
-	/*
-	 * verify ECDSA signature and branch to entry point if match
-	 *
-	 *          Decrypt EDCSA signature from 'p_signature'
-	 *          using public key passed in parameter 'p_pub_key_in'
-	 *          Then compare it to hash from 'p_hash_in' (SHA-256)
-	 *
-	 *          If no match: => infinite loop in bootROM
-	 *
-	 *          else: branch CA7-0 to branch address 'p_entry_in'
-	 *
-	 * @param[in]    p_hash_in : points on hash in (SHA-256)
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    p_pub_key_in : points to an ECDSA public key
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    p_signature : points to an EDCSA signature.
-	 *               Very Important : address alignment constraint :
-	 *               This address should be multiple of 4 bytes only.
-	 * @param[in]    ecc_algo : Ecc algorithm to be used P256 NIST or
-	 *                         Brain_pool 256.
-	 * @param[in]    p_entry_in : points to branch entry point.
-	 *
-	 * @retval  STD_NOT_OK (0x66)
-	 */
-	uint32_t (*p_bootrom_ext_service_ecdsa_verify_and_go)
-		(uint8_t *p_hash_in, uint8_t *p_pub_key_in,
-		 uint8_t *p_signature_in, uint32_t ecc_algo,
-		 uint32_t *p_entry_in);
+	uint32_t (*bootrom_ecdsa_check_key)(uint8_t *pubkey_in,
+					    uint8_t *pubkey_out);
+	uint32_t (*bootrom_ecdsa_verify_signature)(uint8_t *hash_in,
+						   uint8_t *pubkey_in,
+						   uint8_t *signature,
+						   uint32_t ecc_algo);
+	uint32_t (*bootrom_ecdsa_verify_and_go)(uint8_t *hash_in,
+						uint8_t *pub_key_in,
+						uint8_t *signature,
+						uint32_t ecc_algo,
+						uint32_t *entry_in);
 
 	/*
 	 * Information specific to an SD boot

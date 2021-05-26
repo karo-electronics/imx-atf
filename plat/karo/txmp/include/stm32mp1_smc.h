@@ -7,8 +7,6 @@
 #ifndef STM32MP1_SMC_H
 #define STM32MP1_SMC_H
 
-#include <platform_def.h>
-
 /* SMC service generic return codes */
 #define STM32_SMC_OK			0x00000000U
 #define STM32_SMC_NOT_SUPPORTED		0xFFFFFFFFU
@@ -93,6 +91,25 @@
  */
 #define STM32_SMC_RCC_OPP		0x82001009
 
+/*
+ * SIP function STM32_SMC_AUTO_STOP - CPU auto stop for OS driver suspend
+ *
+ * Argument a0: (input) This SMCC ID: STM32_SMC_AUTO_STOP
+ *		(output) Status return code.
+ */
+#define STM32_SMC_AUTO_STOP		0x8200100a
+
+/*
+ * SIP function STM32_SIP_SVC_FUNC_SCMI_AGENT0/1
+ *
+ * Process SCMI message pending in SCMI shared memory buffer
+ * related to SCMI agent IDs 0 and 1. No input or output arguments
+ * passed through CPU general purpose registers, messages are transfer
+ * through a dedicated area in SYSRAM, mapped as device memory.
+ */
+#define STM32_SMC_SCMI_MESSAGE_AGENT0	0x82002000
+#define STM32_SMC_SCMI_MESSAGE_AGENT1	0x82002001
+
 /* SMC function IDs for SiP Service queries */
 
 /*
@@ -149,6 +166,6 @@
 #define STM32_SIP_SVC_VERSION_MINOR	0x1
 
 /* Number of STM32 SiP Calls implemented */
-#define STM32_COMMON_SIP_NUM_CALLS	11
+#define STM32_COMMON_SIP_NUM_CALLS	13
 
 #endif /* STM32MP1_SMC_H */

@@ -4,26 +4,26 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
 #include <assert.h>
-#include <boot_api.h>
-#include <bsec.h>
-#include <debug.h>
-#include <delay_timer.h>
-#include <dt-bindings/clock/stm32mp1-clks.h>
 #include <errno.h>
-#include <gic_common.h>
-#include <gicv2.h>
-#include <mmio.h>
+
 #include <platform_def.h>
-#include <platform.h>
-#include <psci.h>
-#include <stm32mp_common.h>
+
+#include <arch_helpers.h>
+#include <bl32/sp_min/platform_sp_min.h>
+#include <common/debug.h>
+#include <drivers/arm/gic_common.h>
+#include <drivers/arm/gicv2.h>
+#include <drivers/delay_timer.h>
+#include <drivers/st/stm32mp1_clk.h>
+#include <drivers/st/stm32mp1_rcc.h>
+#include <dt-bindings/clock/stm32mp1-clks.h>
+#include <lib/mmio.h>
+#include <lib/psci/psci.h>
+#include <plat/common/platform.h>
+
 #include <stm32mp1_low_power.h>
 #include <stm32mp1_power_config.h>
-#include <stm32mp1_private.h>
-#include <stm32mp1_rcc.h>
-#include <stm32mp1_shared_resources.h>
 
 static uintptr_t stm32_sec_entrypoint;
 static uint32_t cntfrq_core0;
@@ -89,9 +89,8 @@ static int stm32_pwr_domain_on(u_register_t mpidr)
 	/* Wait for this IT to be acknowledged by ROM code. */
 	udelay(10);
 
-	if ((stm32_sec_entrypoint < STM32MP_SYSRAM_BASE) ||
-	    (stm32_sec_entrypoint > (STM32MP_SYSRAM_BASE +
-				     (STM32MP_SYSRAM_SIZE - 1)))) {
+	/* Only one valid entry point */
+	if (stm32_sec_entrypoint != (uintptr_t)&sp_min_warm_entrypoint) {
 		return PSCI_E_INVALID_ADDRESS;
 	}
 
@@ -141,7 +140,7 @@ static void stm32_pwr_domain_suspend(const psci_power_state_t *target_state)
  ******************************************************************************/
 static void stm32_pwr_domain_on_finish(const psci_power_state_t *target_state)
 {
-	stm32mp1_gic_pcpu_init();
+	stm32_gic_pcpu_init();
 
 	write_cntfrq_el0(cntfrq_core0);
 }

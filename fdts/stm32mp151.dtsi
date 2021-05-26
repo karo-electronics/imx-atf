@@ -32,7 +32,7 @@
 		opp-shared;
 	};
 
-	nvmem_layout: nvmem_layout@0 {
+	nvmem_layout: nvmem_layout {
 		compatible = "st,stm32-nvmem-layout";
 
 		nvmem-cells = <&cfg0_otp>,
@@ -190,6 +190,18 @@
 			clock-names = "int";
 			status = "disabled";
 			secure-status = "disabled";
+		};
+
+		sdmmc3: sdmmc@48004000 {
+			compatible = "st,stm32-sdmmc2";
+			reg = <0x48004000 0x400>, <0x48005000 0x400>;
+			reg-names = "sdmmc", "delay";
+			clocks = <&rcc SDMMC3_K>;
+			resets = <&rcc SDMMC3_R>;
+			cap-sd-highspeed;
+			cap-mmc-highspeed;
+			max-frequency = <120000000>;
+			status = "disabled";
 		};
 
 		usbotg_hs: usb-otg@49000000 {
