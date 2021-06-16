@@ -8,6 +8,7 @@
 #include "stm32mp15-pinctrl.dtsi"
 #include "stm32mp15xxab-pinctrl.dtsi"
 #include "stm32mp15-karo.dtsi"
+#include <dt-bindings/clock/stm32mp1-clksrc.h>
 
 / {
 	aliases {
@@ -83,25 +84,25 @@
 
 	st,pll@0 {
 		reg = <0>;
-		cfg = <2 80 0 1 1 1>;
+		cfg = <2 80 0 1 1 PQR(1, 0, 0)>;
 		frac = <2048>;
 	};
 
 	st,pll@1 {
 		reg = <1>;
-		cfg = <2 65 1 0 0 5>;
+		cfg = <2 65 1 0 0 PQR(1, 1, 1)>;
 		frac = <5120>;
 	};
 
 	st,pll@2 {
 		reg = <2>;
-		cfg = <1 33 1 16 36 1>;
+		cfg = <1 33 1 16 36 PQR(1, 0, 0)>;
 		frac = <6660>;
 	};
 
 	st,pll@3 {
 		reg = <3>;
-		cfg = <1 49 11 6 7 3>;
+		cfg = <1 49 11 6 7 PQR(1, 1, 0)>;
 	};
 };
 
