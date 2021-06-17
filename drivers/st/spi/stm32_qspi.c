@@ -454,6 +454,7 @@ int stm32_qspi_init(void)
 	int ret;
 
 	if (fdt_get_address(&fdt) == 0) {
+		ERROR("No FDT found\n");
 		return -FDT_ERR_NOTFOUND;
 	}
 
@@ -464,6 +465,7 @@ int stm32_qspi_init(void)
 	}
 
 	if (info.status == DT_DISABLED) {
+		ERROR("QSPI is disabled\n");
 		return -FDT_ERR_NOTFOUND;
 	}
 
@@ -477,14 +479,21 @@ int stm32_qspi_init(void)
 					&stm32_qspi.mm_base,
 					&stm32_qspi.mm_size);
 	if (ret != 0) {
+		ERROR("Failed to get qspi_mm regs: %d\n", ret);
 		return ret;
 	}
 
-	if (dt_set_pinctrl_config(qspi_node) != 0) {
+	ret = dt_set_pinctrl_config(qspi_node);
+	if (ret) {
+		ERROR("Failed to enable qspi pinctrl: %d\n", ret);
 		return -FDT_ERR_BADVALUE;
 	}
 
 	if ((info.clock < 0) || (info.reset < 0)) {
+		if (info.clock < 0)
+			ERROR("QSPI clock not found: %d\n", info.clock);
+		if (info.reset < 0)
+			ERROR("QSPI reset not found: %d\n", info.reset);
 		return -FDT_ERR_BADVALUE;
 	}
 

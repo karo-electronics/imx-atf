@@ -198,9 +198,9 @@ static int stm32image_partition_size(io_entity_t *entity, size_t *length)
 	if ((header->magic != BOOT_API_IMAGE_HEADER_MAGIC_NB) ||
 	    (header->binary_type != current_part->binary_type) ||
 	    (header->image_length >= stm32image_dev.device_size)) {
-		VERBOSE("%s: partition %s not found at %x\n",
-			__func__, current_part->name, *stm32_img);
-		result = -ENOMEM;
+		ERROR("%s: partition %s not found at %08x; header magic=%08x\n",
+		      __func__, current_part->name, *stm32_img, header->magic);
+		result = -ENOENT;
 		goto out;
 	}
 

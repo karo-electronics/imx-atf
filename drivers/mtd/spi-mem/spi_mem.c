@@ -62,22 +62,26 @@ static bool spi_mem_check_buswidth_req(uint8_t buswidth, bool tx)
 static bool spi_mem_supports_op(const struct spi_mem_op *op)
 {
 	if (!spi_mem_check_buswidth_req(op->cmd.buswidth, true)) {
+		ERROR("spi_mem: invalid cmd width: %u\n", op->cmd.buswidth);
 		return false;
 	}
 
 	if ((op->addr.nbytes != 0U) &&
 	    !spi_mem_check_buswidth_req(op->addr.buswidth, true)) {
+		ERROR("spi_mem: invalid address width: %u\n", op->addr.buswidth);
 		return false;
 	}
 
 	if ((op->dummy.nbytes != 0U) &&
 	    !spi_mem_check_buswidth_req(op->dummy.buswidth, true)) {
+		ERROR("spi_mem: invalid dummy width: %u\n", op->dummy.buswidth);
 		return false;
 	}
 
 	if ((op->data.nbytes != 0U) &&
 	    !spi_mem_check_buswidth_req(op->data.buswidth,
 				       op->data.dir == SPI_MEM_DATA_OUT)) {
+		ERROR("spi_mem: invalid data width: %u\n", op->data.buswidth);
 		return false;
 	}
 
@@ -91,13 +95,13 @@ static int spi_mem_set_speed_mode(void)
 
 	ret = ops->set_speed(spi_slave.max_hz);
 	if (ret != 0) {
-		VERBOSE("Cannot set speed (err=%d)\n", ret);
+		ERROR("Cannot set speed (err=%d)\n", ret);
 		return ret;
 	}
 
 	ret = ops->set_mode(spi_slave.mode);
 	if (ret != 0) {
-		VERBOSE("Cannot set mode (err=%d)\n", ret);
+		ERROR("Cannot set mode (err=%d)\n", ret);
 		return ret;
 	}
 
@@ -109,27 +113,27 @@ static int spi_mem_check_bus_ops(const struct spi_bus_ops *ops)
 	bool error = false;
 
 	if (ops->claim_bus == NULL) {
-		VERBOSE("Ops claim bus is not defined\n");
+		ERROR("Ops claim bus is not defined\n");
 		error = true;
 	}
 
 	if (ops->release_bus == NULL) {
-		VERBOSE("Ops release bus is not defined\n");
+		ERROR("Ops release bus is not defined\n");
 		error = true;
 	}
 
 	if (ops->exec_op == NULL) {
-		VERBOSE("Ops exec op is not defined\n");
+		ERROR("Ops exec op is not defined\n");
 		error = true;
 	}
 
 	if (ops->set_speed == NULL) {
-		VERBOSE("Ops set speed is not defined\n");
+		ERROR("Ops set speed is not defined\n");
 		error = true;
 	}
 
 	if (ops->set_mode == NULL) {
-		VERBOSE("Ops set mode is not defined\n");
+		ERROR("Ops set mode is not defined\n");
 		error = true;
 	}
 
@@ -156,13 +160,14 @@ int spi_mem_exec_op(const struct spi_mem_op *op)
 		op->addr.val, op->data.nbytes);
 
 	if (!spi_mem_supports_op(op)) {
-		WARN("Error in spi_mem_support\n");
+		WARN("spi_mem operation %02x not supported\n",
+		     op->cmd.opcode);
 		return -ENOTSUP;
 	}
 
 	ret = ops->claim_bus(spi_slave.cs);
 	if (ret != 0) {
-		WARN("Error claim_bus\n");
+		WARN("Failed to claim qspi bus: %d\n", ret);
 		return ret;
 	}
 
