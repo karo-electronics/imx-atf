@@ -131,11 +131,14 @@ static void enter_cstop(uint32_t mode, uint32_t nsec_addr)
 	stm32_clean_context();
 
 	if (mode == STM32_PM_CSTOP_ALLOW_STANDBY_DDR_SR) {
+		NOTICE("Entering CStandby Mode.\n");
 		/*
 		 * The first 64 bytes of DDR need to be saved for DDR DQS
 		 * training
 		 */
 		stm32_save_ddr_training_area();
+	} else if (mode == STM32_PM_CSTOP_ALLOW_LP_STOP) {
+		NOTICE("Entering CStop Mode.\n");
 	}
 
 	/* Clear RCC interrupt before enabling it */
