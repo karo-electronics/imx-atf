@@ -153,11 +153,11 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 				  imx_get_uart_baudrate(), &console);
 
 #if DEBUG
-	console_set_scope(&console.console,
+	console_set_scope(&console,
 			  CONSOLE_FLAG_BOOT | CONSOLE_FLAG_RUNTIME);
 #else
 	/* This console is only used for boot stage */
-	console_set_scope(&console.console, CONSOLE_FLAG_BOOT);
+	console_set_scope(&console, CONSOLE_FLAG_BOOT);
 #endif
 	INFO("uart_base=%08x clock=%uMHz baudrate=%u\n",
 	     IMX_BOOT_UART_BASE, IMX_BOOT_UART_CLK_IN_HZ / 1000000,
