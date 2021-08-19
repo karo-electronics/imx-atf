@@ -190,6 +190,11 @@ void __dead2 imx_system_reset(void)
 #else
 	/* Assert WDOG_SRS (low) for SOFTRESET */
 	val = (val & ~WDOG_WCR_SRS) | WDOG_WCR_SRE;
+	/*
+	 * Clear the Core0 restart address to prevent the ROM code
+	 * on i.MX8MMini from jumping to an invalid address upon restart
+	 */
+	imx_set_cpu_secure_entry(0, 0);
 #endif
 	mmio_write_16(wdog_base, val);
 

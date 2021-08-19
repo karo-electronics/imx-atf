@@ -64,7 +64,7 @@ static unsigned int pu_domain_status;
 #define VPU_RCR		0x44
 
 #define VPU_CTL_BASE		0x38330000
-#define BLK_SFT_RSTN_CSR 	0x0
+#define BLK_SFT_RSTN_CSR	0x0
 #define H1_SFT_RSTN		BIT(2)
 #define G1_SFT_RSTN		BIT(1)
 #define G2_SFT_RSTN		BIT(0)
@@ -286,6 +286,29 @@ void imx_gpc_pm_domain_enable(uint32_t domain_id, bool on)
 				;
 		}
 	}
+}
+
+void imx_set_cpu_lpm(unsigned int core_id, bool pdn)
+{
+	bakery_lock_get(&gpc_lock);
+
+	if (pdn) {
+		/* enable the core WFI PDN & IRQ PUP */
+		mmio_setbits_32(IMX_GPC_BASE + LPCR_A53_AD, COREx_WFI_PDN(core_id) |
+				COREx_IRQ_WUP(core_id));
+		/* assert the pcg pcr bit of the core */
+		mmio_setbits_32(IMX_GPC_BASE + COREx_PGC_PCR(core_id), 0x1);
+	} else {
+		if (core_id == 0)
+			imx_set_cpu_secure_entry(core_id, 0);
+		/* disbale CORE WFI PDN & IRQ PUP */
+		mmio_clrbits_32(IMX_GPC_BASE + LPCR_A53_AD, COREx_WFI_PDN(core_id) |
+				COREx_IRQ_WUP(core_id));
+		/* deassert the pcg pcr bit of the core */
+		mmio_clrbits_32(IMX_GPC_BASE + COREx_PGC_PCR(core_id), 0x1);
+	}
+
+	bakery_lock_release(&gpc_lock);
 }
 
 static void imx8mm_tz380_init(void)
