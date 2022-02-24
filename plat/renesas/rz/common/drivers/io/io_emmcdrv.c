@@ -61,7 +61,7 @@ static int32_t emmcdrv_block_read(io_entity_t *entity, uintptr_t buffer,
 	last_sector = (fp->base + fp->file_pos + length -1 ) >> EMMC_SECTOR_SIZE_SHIFT;
 	sector_count = last_sector - first_sector + 1;
 
-	NOTICE("BL2: Load dst=0x%lx src=(p:%d)0x%llx(%d) len=0x%lx(%d)\n",
+	INFO("BL2: Load dst=0x%lx src=(p:%d)0x%llx(%d) len=0x%lx(%d)\n",
 			buffer,
 			fp->partition, (fp->base + fp->file_pos),
 			first_sector, length, sector_count);
@@ -136,7 +136,7 @@ static int32_t emmcdrv_block_open(io_dev_info_t *dev_info,
 	current_file.in_use = 1;
 
 	current_file.partition = mmc_drv_obj.boot_partition_en;
-	NOTICE("BL2: eMMC boot from partition %d\n", current_file.partition);
+	INFO("BL2: eMMC boot from partition %d\n", current_file.partition);
 
 	if (emmc_select_partition(current_file.partition) != EMMC_SUCCESS) {
 		return IO_FAIL;
