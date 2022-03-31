@@ -222,6 +222,7 @@ $(eval $(call add_define,RZG_SOC))
 
 include drivers/renesas/common/ddr/ddr.mk
 include drivers/renesas/rzg/qos/qos.mk
+include drivers/renesas/rzg/timer/timer.mk
 include drivers/renesas/rzg/pfc/pfc.mk
 include lib/libfdt/libfdt.mk
 

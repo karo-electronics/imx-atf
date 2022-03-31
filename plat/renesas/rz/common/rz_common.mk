@@ -75,6 +75,8 @@ include drivers/arm/gic/v3/gicv3.mk
 
 BL31_SOURCES	+=	lib/cpus/aarch64/cortex_a55.S					\
 					${GICV3_SOURCES}								\
+					drivers/delay_timer/delay_timer.c						\
+					drivers/delay_timer/generic_delay_timer.c						\
 					drivers/arm/tzc/tzc400.c						\
 					plat/common/plat_gicv3.c						\
 					plat/common/plat_psci_common.c					\

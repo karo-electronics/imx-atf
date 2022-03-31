@@ -75,6 +75,7 @@ PLAT_INCLUDES	:=	-Iplat/renesas/common/include/registers	\
 			-Iplat/renesas/common
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/renesas/common/iic_dvfs/iic_dvfs.c \
+				drivers/delay_timer/delay_timer.c 	   \
 				plat/renesas/common/rcar_common.c
 
 RCAR_GIC_SOURCES	:=	drivers/arm/gic/common/gic_common.c	\

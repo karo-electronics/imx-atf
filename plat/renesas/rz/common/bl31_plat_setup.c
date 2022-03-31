@@ -8,6 +8,7 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <common/bl_common.h>
+#include <drivers/generic_delay_timer.h>
 #include <lib/xlat_tables/xlat_tables_compat.h>
 #include <plat/common/common_def.h>
 
@@ -73,6 +74,8 @@ void bl31_platform_setup(void)
 	/* Setup TZC-400 */
 	plat_security_setup();
 
+	// generic timer setup
+	generic_delay_timer_init();
 #if !DEBUG_RZG2L_FPGA
 	/* initialize GIC-600 */
 	plat_gic_driver_init();
