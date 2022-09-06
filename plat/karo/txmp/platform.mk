@@ -245,7 +245,7 @@ clean_stm32image:
 
 check_dtc_version:
 	$(eval DTC_V = $(shell $(DTC) -v | awk '{print $$NF}'))
-	$(eval DTC_VERSION = $(shell printf "%d" $(shell echo $(DTC_V) | cut -d- -f1 | sed "s/\./0/g")))
+	$(eval DTC_VERSION = $(shell printf "%d" $(shell echo ${DTC_V} | cut -d- -f1 | sed "s/\./0/g" | grep -o "[0-9]*")))
 	@if [ $(DTC_VERSION) -lt 10404 ]; then \
 		echo "dtc version too old ($(DTC_V)), you need at least version 1.4.4"; \
 		false; \
