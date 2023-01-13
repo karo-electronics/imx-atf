@@ -14,10 +14,16 @@ override RESET_TO_BL31 := 1
 override GICV2_G0_FOR_EL3 := 1
 override WARMBOOT_ENABLE_DCACHE_EARLY := 1
 
+EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
+
 # Do not enable SVE
 ENABLE_SVE_FOR_NS	:= 0
 
 WORKAROUND_CVE_2017_5715	:=	0
+
+ARM_XLAT_TABLES_LIB_V1         :=      1
+$(eval $(call assert_boolean,ARM_XLAT_TABLES_LIB_V1))
+$(eval $(call add_define,ARM_XLAT_TABLES_LIB_V1))
 
 ifdef ZYNQMP_ATF_MEM_BASE
     $(eval $(call add_define,ZYNQMP_ATF_MEM_BASE))
@@ -43,11 +49,11 @@ endif
 
 
 ifdef ZYNQMP_WDT_RESTART
-$(eval $(call add_define,ZYNQMP_WDT_RESTART))
+    $(eval $(call add_define,ZYNQMP_WDT_RESTART))
 endif
 
 ifdef ZYNQMP_IPI_CRC_CHECK
-  $(warning "ZYNQMP_IPI_CRC_CHECK macro is deprecated...instead please use IPI_CRC_CHECK.")
+    $(warning "ZYNQMP_IPI_CRC_CHECK macro is deprecated...instead please use IPI_CRC_CHECK.")
 endif
 
 ifdef IPI_CRC_CHECK
@@ -61,6 +67,7 @@ PLAT_INCLUDES		:=	-Iinclude/plat/arm/common/			\
 				-Iplat/xilinx/zynqmp/include/			\
 				-Iplat/xilinx/zynqmp/pm_service/		\
 
+include lib/libfdt/libfdt.mk
 # Include GICv2 driver files
 include drivers/arm/gic/v2/gicv2.mk
 
@@ -92,6 +99,8 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				lib/cpus/aarch64/aem_generic.S			\
 				lib/cpus/aarch64/cortex_a53.S			\
 				plat/common/plat_psci_common.c			\
+				common/fdt_fixup.c				\
+				${LIBFDT_SRCS}					\
 				plat/xilinx/common/ipi_mailbox_service/ipi_mailbox_svc.c \
 				plat/xilinx/common/pm_service/pm_ipi.c		\
 				plat/xilinx/common/plat_startup.c		\
@@ -107,7 +116,13 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				plat/xilinx/zynqmp/pm_service/pm_api_clock.c	\
 				plat/xilinx/zynqmp/pm_service/pm_client.c
 
+ifeq (${SDEI_SUPPORT},1)
+BL31_SOURCES		+=	plat/xilinx/zynqmp/zynqmp_ehf.c			\
+				plat/xilinx/zynqmp/zynqmp_sdei.c
+endif
+
 BL31_CPPFLAGS		+=	-fno-jump-tables
+TF_CFLAGS_aarch64	+=	-mbranch-protection=none
 
 ifneq (${RESET_TO_BL31},1)
   $(error "Using BL31 as the reset vector is only one option supported on ZynqMP. Please set RESET_TO_BL31 to 1.")

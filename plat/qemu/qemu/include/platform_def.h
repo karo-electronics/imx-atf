@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -80,8 +80,8 @@
 #define SEC_ROM_BASE			0x00000000
 #define SEC_ROM_SIZE			0x00020000
 
-#define NS_DRAM0_BASE			0x40000000
-#define NS_DRAM0_SIZE			0x3de00000
+#define NS_DRAM0_BASE			ULL(0x40000000)
+#define NS_DRAM0_SIZE			ULL(0xc0000000)
 
 #define SEC_SRAM_BASE			0x0e000000
 #define SEC_SRAM_SIZE			0x00060000
@@ -269,5 +269,10 @@
  * System counter
  */
 #define SYS_COUNTER_FREQ_IN_TICKS	((1000 * 1000 * 1000) / 16)
+
+/*
+ * Maximum size of Event Log buffer used in Measured Boot Event Log driver
+ */
+#define	PLAT_EVENT_LOG_MAX_SIZE		UL(0x400)
 
 #endif /* PLATFORM_DEF_H */

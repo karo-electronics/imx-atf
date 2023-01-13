@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 NXP
+ * Copyright 2020-2022 NXP
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -34,11 +34,18 @@
 #define PLAT_WAIT_RET_STATE		U(1)
 #define PLAT_STOP_OFF_STATE		U(3)
 
+#define PLAT_PRI_BITS			U(3)
+#define PLAT_SDEI_CRITICAL_PRI		0x10
+#define PLAT_SDEI_NORMAL_PRI		0x20
+#define PLAT_SDEI_SGI_PRIVATE		U(9)
+
 #define BL31_BASE			U(0x960000)
 #define BL31_LIMIT			U(0x980000)
 
 /* non-secure uboot base */
 #define PLAT_NS_IMAGE_OFFSET		U(0x40200000)
+
+#define BL32_FDT_OVERLAY_ADDR		(PLAT_NS_IMAGE_OFFSET + 0x3000000)
 
 /* GICv3 base address */
 #define PLAT_GICD_BASE			U(0x38800000)

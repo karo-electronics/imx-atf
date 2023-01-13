@@ -13,7 +13,6 @@
 
 #include <common/debug.h>
 #include <common/runtime_svc.h>
-#include <drivers/delay_timer.h>
 #include <lib/bakery_lock.h>
 #include <lib/mmio.h>
 
@@ -38,9 +37,6 @@
 
 /* IPI register bit mask */
 #define IPI_BIT_MASK(I) (ipi_table[(I)].ipi_bit_mask)
-
-/* IPI Timeout */
-#define TIMEOUT_COUNT_US	U(0x4000)
 
 /* IPI configuration table */
 const static struct ipi_config *ipi_table;
@@ -73,8 +69,9 @@ static inline int is_ipi_mb_within_range(uint32_t local, uint32_t remote)
 {
 	int ret = 1;
 
-	if (remote >= ipi_total || local >= ipi_total)
+	if (remote >= ipi_total || local >= ipi_total) {
 		ret = 0;
+	}
 
 	return ret;
 }
@@ -92,12 +89,15 @@ int ipi_mb_validate(uint32_t local, uint32_t remote, unsigned int is_secure)
 {
 	int ret = 0;
 
-	if (!is_ipi_mb_within_range(local, remote))
+	if (!is_ipi_mb_within_range(local, remote)) {
 		ret = -EINVAL;
-	else if (IPI_IS_SECURE(local) && !is_secure)
+	} else if (IPI_IS_SECURE(local) && !is_secure) {
 		ret = -EPERM;
-	else if (IPI_IS_SECURE(remote) && !is_secure)
+	} else if (IPI_IS_SECURE(remote) && !is_secure) {
 		ret = -EPERM;
+	} else {
+		/* To fix the misra 15.7 warning */
+	}
 
 	return ret;
 }
@@ -145,11 +145,13 @@ int ipi_mb_enquire_status(uint32_t local, uint32_t remote)
 	uint32_t status;
 
 	status = mmio_read_32(IPI_REG_BASE(local) + IPI_OBR_OFFSET);
-	if (status & IPI_BIT_MASK(remote))
+	if (status & IPI_BIT_MASK(remote)) {
 		ret |= IPI_MB_STATUS_SEND_PENDING;
+	}
 	status = mmio_read_32(IPI_REG_BASE(local) + IPI_ISR_OFFSET);
-	if (status & IPI_BIT_MASK(remote))
+	if (status & IPI_BIT_MASK(remote)) {
 		ret |= IPI_MB_STATUS_RECV_PENDING;
+	}
 
 	return ret;
 }
@@ -160,30 +162,21 @@ int ipi_mb_enquire_status(uint32_t local, uint32_t remote)
  * @remote - remote IPI ID
  * @is_blocking - if to trigger the notification in blocking mode or not.
  *
- * return - 0 - Success or Error incase of timeout
  * It sets the remote bit in the IPI agent trigger register.
  *
  */
-int ipi_mb_notify(uint32_t local, uint32_t remote, uint32_t is_blocking)
+void ipi_mb_notify(uint32_t local, uint32_t remote, uint32_t is_blocking)
 {
 	uint32_t status;
-	const unsigned int timeout_count = TIMEOUT_COUNT_US;
-	uint64_t timeout;
 
 	mmio_write_32(IPI_REG_BASE(local) + IPI_TRIG_OFFSET,
 		      IPI_BIT_MASK(remote));
 	if (is_blocking) {
-		timeout = timeout_init_us(timeout_count);
 		do {
 			status = mmio_read_32(IPI_REG_BASE(local) +
 					      IPI_OBR_OFFSET);
-			if (timeout_elapsed(timeout)) {
-				return -ETIMEDOUT;
-			}
 		} while (status & IPI_BIT_MASK(remote));
 	}
-
-	return 0;
 }
 
 /* ipi_mb_ack() - Ack IPI mailbox notification from the other end

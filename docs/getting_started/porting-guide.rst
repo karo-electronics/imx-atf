@@ -562,15 +562,6 @@ behaviour of the ``assert()`` function (for example, to save memory).
    doesn't print anything to the console. If ``PLAT_LOG_LEVEL_ASSERT`` isn't
    defined, it defaults to ``LOG_LEVEL``.
 
-If the platform port uses the Activity Monitor Unit, the following constant
-may be defined:
-
--  **PLAT_AMU_GROUP1_COUNTERS_MASK**
-   This mask reflects the set of group counters that should be enabled.  The
-   maximum number of group 1 counters supported by AMUv1 is 16 so the mask
-   can be at most 0xffff. If the platform does not define this mask, no group 1
-   counters are enabled.
-
 File : plat_macros.S [mandatory]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -891,8 +882,74 @@ symmetric key/identifier using img_id.
 
 On success the function should return 0 and a negative error code otherwise.
 
-Note that this API depends on ``DECRYPTION_SUPPORT`` build flag which is
-marked as experimental.
+Note that this API depends on ``DECRYPTION_SUPPORT`` build flag.
+
+Function : plat_fwu_set_images_source() [when PSA_FWU_SUPPORT == 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : const struct fwu_metadata *metadata
+    Return   : void
+
+This function is mandatory when PSA_FWU_SUPPORT is enabled.
+It provides a means to retrieve image specification (offset in
+non-volatile storage and length) of active/updated images using the passed
+FWU metadata, and update I/O policies of active/updated images using retrieved
+image specification information.
+Further I/O layer operations such as I/O open, I/O read, etc. on these
+images rely on this function call.
+
+In Arm platforms, this function is used to set an I/O policy of the FIP image,
+container of all active/updated secure and non-secure images.
+
+Function : plat_fwu_set_metadata_image_source() [when PSA_FWU_SUPPORT == 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : unsigned int image_id, uintptr_t *dev_handle,
+               uintptr_t *image_spec
+    Return   : int
+
+This function is mandatory when PSA_FWU_SUPPORT is enabled. It is
+responsible for setting up the platform I/O policy of the requested metadata
+image (either FWU_METADATA_IMAGE_ID or BKUP_FWU_METADATA_IMAGE_ID) that will
+be used to load this image from the platform's non-volatile storage.
+
+FWU metadata can not be always stored as a raw image in non-volatile storage
+to define its image specification (offset in non-volatile storage and length)
+statically in I/O policy.
+For example, the FWU metadata image is stored as a partition inside the GUID
+partition table image. Its specification is defined in the partition table
+that needs to be parsed dynamically.
+This function provides a means to retrieve such dynamic information to set
+the I/O policy of the FWU metadata image.
+Further I/O layer operations such as I/O open, I/O read, etc. on FWU metadata
+image relies on this function call.
+
+It returns '0' on success, otherwise a negative error value on error.
+Alongside, returns device handle and image specification from the I/O policy
+of the requested FWU metadata image.
+
+Function : plat_fwu_get_boot_idx() [when PSA_FWU_SUPPORT == 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : void
+    Return   : uint32_t
+
+This function is mandatory when PSA_FWU_SUPPORT is enabled. It provides the
+means to retrieve the boot index value from the platform. The boot index is the
+bank from which the platform has booted the firmware images.
+
+By default, the platform will read the metadata structure and try to boot from
+the active bank. If the platform fails to boot from the active bank due to
+reasons like an Authentication failure, or on crossing a set number of watchdog
+resets while booting from the active bank, the platform can then switch to boot
+from a different bank. This function then returns the bank that the platform
+should boot its images from.
 
 Common optional modifications
 -----------------------------
@@ -1151,6 +1208,43 @@ This function returns SMC_ARCH_CALL_SUCCESS if the platform supports
 the SMCCC function specified in the argument; otherwise returns
 SMC_ARCH_CALL_NOT_SUPPORTED.
 
+Function : plat_mboot_measure_image()
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : unsigned int, image_info_t *
+    Return   : int
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function measures the given image and records its measurement using
+   the measured boot backend driver.
+-  On the Arm FVP port, this function measures the given image using its
+   passed id and information and then records that measurement in the
+   Event Log buffer.
+-  This function must return 0 on success, a signed integer error code
+   otherwise.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
+
+Function : plat_mboot_measure_critical_data()
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : unsigned int, const void *, size_t
+    Return   : int
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function measures the given critical data structure and records its
+   measurement using the measured boot backend driver.
+-  This function must return 0 on success, a signed integer error code
+   otherwise.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
+
 Modifications specific to a Boot Loader stage
 ---------------------------------------------
 
@@ -1401,6 +1495,42 @@ This function must return 0 on success, a non-null error code otherwise.
 
 The default implementation of this function asserts therefore platforms must
 override it when using the FWU feature.
+
+Function : bl1_plat_mboot_init() [optional]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : void
+    Return   : void
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function is used to initialize the backend driver(s) of measured boot.
+-  On the Arm FVP port, this function is used to initialize the Event Log
+   backend driver, and also to write header information in the Event Log buffer.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
+
+Function : bl1_plat_mboot_finish() [optional]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : void
+    Return   : void
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function is used to finalize the measured boot backend driver(s),
+   and also, set the information for the next bootloader component to
+   extend the measurement if needed.
+-  On the Arm FVP port, this function is used to pass the base address of
+   the Event Log buffer and its size to BL2 via tb_fw_config to extend the
+   Event Log buffer with the measurement of various images loaded by BL2.
+   It results in panic on error.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
 
 Boot Loader Stage 2 (BL2)
 -------------------------
@@ -1690,6 +1820,42 @@ Application Processor (AP) for BL2U execution to continue.
 This function returns 0 on success, a negative error code otherwise.
 This function is included if SCP_BL2U_BASE is defined.
 
+Function : bl2_plat_mboot_init() [optional]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : void
+    Return   : void
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function is used to initialize the backend driver(s) of measured boot.
+-  On the Arm FVP port, this function is used to initialize the Event Log
+   backend driver with the Event Log buffer information (base address and
+   size) received from BL1. It results in panic on error.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
+
+Function : bl2_plat_mboot_finish() [optional]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : void
+    Return   : void
+
+When the MEASURED_BOOT flag is enabled:
+
+-  This function is used to finalize the measured boot backend driver(s),
+   and also, set the information for the next bootloader component to extend
+   the measurement if needed.
+-  On the Arm FVP port, this function is used to pass the Event Log buffer
+   information (base address and size) to non-secure(BL33) and trusted OS(BL32)
+   via nt_fw and tos_fw config respectively. It results in panic on error.
+
+When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
+
 Boot Loader Stage 3-1 (BL31)
 ----------------------------
 
@@ -1851,6 +2017,58 @@ state. This function must return a pointer to the ``entry_point_info`` structure
 (that was copied during ``bl31_early_platform_setup()``) if the image exists. It
 should return NULL otherwise.
 
+Function : plat_get_cca_attest_token() [mandatory when ENABLE_RME == 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : uintptr_t, size_t *, uintptr_t, size_t
+    Return   : int
+
+This function returns the Platform attestation token.
+
+The parameters of the function are:
+
+    arg0 - A pointer to the buffer where the Platform token should be copied by
+           this function. The buffer must be big enough to hold the Platform
+           token.
+
+    arg1 - Contains the size (in bytes) of the buffer passed in arg0. The
+           function returns the platform token length in this parameter.
+
+    arg2 - A pointer to the buffer where the challenge object is stored.
+
+    arg3 - The length of the challenge object in bytes. Possible values are 32,
+           48 and 64.
+
+The function returns 0 on success, -EINVAL on failure.
+
+Function : plat_get_cca_realm_attest_key() [mandatory when ENABLE_RME == 1]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+::
+
+    Argument : uintptr_t, size_t *, unsigned int
+    Return   : int
+
+This function returns the delegated realm attestation key which will be used to
+sign Realm attestation token. The API currently only supports P-384 ECC curve
+key.
+
+The parameters of the function are:
+
+    arg0 - A pointer to the buffer where the attestation key should be copied
+           by this function. The buffer must be big enough to hold the
+           attestation key.
+
+    arg1 - Contains the size (in bytes) of the buffer passed in arg0. The
+           function returns the attestation key length in this parameter.
+
+    arg2 - The type of the elliptic curve to which the requested attestation key
+           belongs.
+
+The function returns 0 on success, -EINVAL on failure.
+
 Function : bl31_plat_enable_mmu [optional]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1899,21 +2117,6 @@ frequency for the CPU's generic timer. This value will be programmed into the
 ``CNTFRQ_EL0`` register. In Arm standard platforms, it returns the base frequency
 of the system counter, which is retrieved from the first entry in the frequency
 modes table.
-
-Function : plat_arm_set_twedel_scr_el3() [optional]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : void
-    Return   : uint32_t
-
-This function is used in v8.6+ systems to set the WFE trap delay value in
-SCR_EL3. If this function returns TWED_DISABLED or is left unimplemented, this
-feature is not enabled.  The only hook provided is to set the TWED fields in
-SCR_EL3, there are similar fields in HCR_EL2, SCTLR_EL2, and SCTLR_EL1 to adjust
-the WFE trap delays in lower ELs and these fields should be set by the
-appropriate EL2 or EL1 code depending on the platform configuration.
 
 #define : PLAT_PERCPU_BAKERY_LOCK_SIZE [optional]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2988,7 +3191,7 @@ amount of open resources per driver.
 
 --------------
 
-*Copyright (c) 2013-2021, Arm Limited and Contributors. All rights reserved.*
+*Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.*
 
 .. _PSCI: http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
 .. _Arm Generic Interrupt Controller version 2.0 (GICv2): http://infocenter.arm.com/help/topic/com.arm.doc.ihi0048b/index.html

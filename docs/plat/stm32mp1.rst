@@ -2,15 +2,34 @@ STMicroelectronics STM32MP1
 ===========================
 
 STM32MP1 is a microprocessor designed by STMicroelectronics
-based on a dual Arm Cortex-A7.
+based on Arm Cortex-A7.
 It is an Armv7-A platform, using dedicated code from TF-A.
-The STM32MP1 chip also embeds a Cortex-M4.
 More information can be found on `STM32MP1 Series`_ page.
 
 
 STM32MP1 Versions
 -----------------
-The STM32MP1 series is available in 3 different lines which are pin-to-pin compatible:
+
+There are 2 variants for STM32MP1: STM32MP13 and STM32MP15
+
+STM32MP13 Versions
+~~~~~~~~~~~~~~~~~~
+The STM32MP13 series is available in 3 different lines which are pin-to-pin compatible:
+
+- STM32MP131: Single Cortex-A7 core
+- STM32MP133: STM32MP131 + 2*CAN, ETH2(GMAC), ADC1
+- STM32MP135: STM32MP133 + DCMIPP, LTDC
+
+Each line comes with a security option (cryptography & secure boot) and a Cortex-A frequency option:
+
+- A      Cortex-A7 @ 650 MHz
+- C      Secure Boot + HW Crypto + Cortex-A7 @ 650 MHz
+- D      Cortex-A7 @ 900 MHz
+- F      Secure Boot + HW Crypto + Cortex-A7 @ 900 MHz
+
+STM32MP15 Versions
+~~~~~~~~~~~~~~~~~~
+The STM32MP15 series is available in 3 different lines which are pin-to-pin compatible:
 
 - STM32MP157: Dual Cortex-A7 cores, Cortex-M4 core @ 209 MHz, 3D GPU, DSI display interface and CAN FD
 - STM32MP153: Dual Cortex-A7 cores, Cortex-M4 core @ 209 MHz and CAN FD
@@ -37,6 +56,17 @@ The TF-A image must be properly formatted with a STM32 header structure
 for ROM code is able to load this image.
 Tool stm32image can be used to prepend this header to the generated TF-A binary.
 
+Boot with FIP
+~~~~~~~~~~~~~
+The use of FIP is now the recommended way to boot STM32MP1 platform.
+Only BL2 (with STM32 header) is loaded by ROM code. The other binaries are
+inside the FIP binary: BL32 (SP_min or OP-TEE), U-Boot and their respective
+device tree blobs.
+
+STM32IMAGE bootchain
+~~~~~~~~~~~~~~~~~~~~
+Although still supported, this way of booting is not recommended.
+Pease use FIP instead.
 At compilation step, BL2, BL32 and DTB file are linked together in a single
 binary. The stm32image tool is also generated and the header is added to TF-A
 binary. This binary file with header is named tf-a-stm32mp157c-ev1.stm32.
@@ -55,15 +85,17 @@ Memory mapping
                |       ...       |
                |                 |
     0x2FFC0000 +-----------------+ \
-               |                 | |
-               |       ...       | |
-               |                 | |
-    0x2FFD8000 +-----------------+ |
-               |    TF-A DTB     | | Embedded SRAM
-    0x2FFDC000 +-----------------+ |
-               |       BL2       | |
-    0x2FFEF000 +-----------------+ |
+               |     BL32 DTB    | |
+    0x2FFC5000 +-----------------+ |
                |       BL32      | |
+    0x2FFDF000 +-----------------+ |
+               |       ...       | |
+    0x2FFE3000 +-----------------+ |
+               |     BL2 DTB     | | Embedded SRAM
+    0x2FFEA000 +-----------------+ |
+               |       BL2       | |
+    0x2FFFF000 +-----------------+ |
+               |  SCMI mailbox   | |
     0x30000000 +-----------------+ /
                |                 |
                |       ...       |
@@ -102,23 +134,133 @@ Available storage medias are:
 - ``STM32MP_SPI_NAND``
 - ``STM32MP_SPI_NOR``
 
-To build with SP_min and support for all bootable devices:
+Serial boot devices:
+
+- ``STM32MP_UART_PROGRAMMER``
+- ``STM32MP_USB_PROGRAMMER``
+
+
+Other configuration flags:
+
+- | ``DTB_FILE_NAME``: to precise board device-tree blob to be used.
+  | Default: stm32mp157c-ev1.dtb
+- | ``STM32MP_EARLY_CONSOLE``: to enable early traces before clock driver is setup.
+  | Default: 0 (disabled)
+- | ``STM32MP_UART_BAUDRATE``: to select UART baud rate.
+  | Default: 115200
+- | ``STM32_TF_VERSION``: to manage BL2 monotonic counter.
+  | Default: 0
+- | ``STM32MP13``: to select STM32MP13 variant configuration.
+  | Default: 0
+- | ``STM32MP15``: to select STM32MP15 variant configuration.
+  | Default: 1
+
+
+Boot with FIP
+~~~~~~~~~~~~~
+You need to build BL2, BL32 (SP_min or OP-TEE) and BL33 (U-Boot) before building FIP binary.
+
+U-Boot
+______
 
 .. code:: bash
 
-    make CROSS_COMPILE=arm-linux-gnueabihf- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 AARCH32_SP=sp_min STM32MP_SDMMC=1 STM32MP_EMMC=1 STM32MP_RAW_NAND=1 STM32MP_SPI_NAND=1
-    STM32MP_SPI_NOR=1 DTB_FILE_NAME=stm32mp157c-ev1.dtb
     cd <u-boot_directory>
     make stm32mp15_trusted_defconfig
     make DEVICE_TREE=stm32mp157c-ev1 all
 
-To build TF-A with OP-TEE support for all bootable devices:
+OP-TEE (optional)
+_________________
 
 .. code:: bash
 
-    make CROSS_COMPILE=arm-linux-gnueabihf- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 AARCH32_SP=optee STM32MP_SDMMC=1 STM32MP_EMMC=1 STM32MP_RAW_NAND=1 STM32MP_SPI_NAND=1 STM32MP_SPI_NOR=1 DTB_FILE_NAME=stm32mp157c-ev1.dtb
     cd <optee_directory>
-    make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm PLATFORM=stm32mp1 CFG_EMBED_DTB_SOURCE_FILE=stm32mp157c-ev1.dts
+    make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm PLATFORM=stm32mp1 \
+        CFG_EMBED_DTB_SOURCE_FILE=stm32mp157c-ev1.dts
+
+
+TF-A BL32 (SP_min)
+__________________
+If you choose not to use OP-TEE, you can use TF-A SP_min.
+To build TF-A BL32, and its device tree file:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-none-eabi- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        AARCH32_SP=sp_min DTB_FILE_NAME=stm32mp157c-ev1.dtb bl32 dtbs
+
+TF-A BL2
+________
+To build TF-A BL2 with its STM32 header for SD-card boot:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-none-eabi- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        DTB_FILE_NAME=stm32mp157c-ev1.dtb STM32MP_SDMMC=1
+
+For other boot devices, you have to replace STM32MP_SDMMC in the previous command
+with the desired device flag.
+
+This BL2 is independent of the BL32 used (SP_min or OP-TEE)
+
+
+FIP
+___
+With BL32 SP_min:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-none-eabi- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        AARCH32_SP=sp_min \
+        DTB_FILE_NAME=stm32mp157c-ev1.dtb \
+        BL33=<u-boot_directory>/u-boot-nodtb.bin \
+        BL33_CFG=<u-boot_directory>/u-boot.dtb \
+        fip
+
+With OP-TEE:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-none-eabi- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        AARCH32_SP=optee \
+        DTB_FILE_NAME=stm32mp157c-ev1.dtb \
+        BL33=<u-boot_directory>/u-boot-nodtb.bin \
+        BL33_CFG=<u-boot_directory>/u-boot.dtb \
+        BL32=<optee_directory>/tee-header_v2.bin \
+        BL32_EXTRA1=<optee_directory>/tee-pager_v2.bin
+        BL32_EXTRA2=<optee_directory>/tee-pageable_v2.bin
+        fip
+
+
+STM32IMAGE bootchain
+~~~~~~~~~~~~~~~~~~~~
+You need to add the following flag to the make command:
+``STM32MP_USE_STM32IMAGE=1``
+
+To build with SP_min and support for SD-card boot:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-linux-gnueabihf- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        AARCH32_SP=sp_min STM32MP_SDMMC=1 DTB_FILE_NAME=stm32mp157c-ev1.dtb \
+        STM32MP_USE_STM32IMAGE=1
+
+    cd <u-boot_directory>
+    make stm32mp15_trusted_defconfig
+    make DEVICE_TREE=stm32mp157c-ev1 all
+
+To build TF-A with OP-TEE support for SD-card boot:
+
+.. code:: bash
+
+    make CROSS_COMPILE=arm-linux-gnueabihf- PLAT=stm32mp1 ARCH=aarch32 ARM_ARCH_MAJOR=7 \
+        AARCH32_SP=optee STM32MP_SDMMC=1 DTB_FILE_NAME=stm32mp157c-ev1.dtb \
+        STM32MP_USE_STM32IMAGE=1
+
+    cd <optee_directory>
+    make CROSS_COMPILE=arm-linux-gnueabihf- ARCH=arm PLATFORM=stm32mp1 \
+        CFG_EMBED_DTB_SOURCE_FILE=stm32mp157c-ev1.dts
+
     cd <u-boot_directory>
     make stm32mp15_trusted_defconfig
     make DEVICE_TREE=stm32mp157c-ev1 all
@@ -132,7 +274,19 @@ The following build options are supported:
 Populate SD-card
 ----------------
 
-The SD-card has to be formated with GPT.
+Boot with FIP
+~~~~~~~~~~~~~
+The SD-card has to be formatted with GPT.
+It should contain at least those partitions:
+
+- fsbl: to copy the tf-a-stm32mp157c-ev1.stm32 binary (BL2)
+- fip: which contains the FIP binary
+
+Usually, two copies of fsbl are used (fsbl1 and fsbl2) instead of one partition fsbl.
+
+STM32IMAGE bootchain
+~~~~~~~~~~~~~~~~~~~~
+The SD-card has to be formatted with GPT.
 It should contain at least those partitions:
 
 - fsbl: to copy the tf-a-stm32mp157c-ev1.stm32 binary

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -61,7 +61,9 @@
 #define CTX_ELR_EL3		U(0x20)
 #define CTX_PMCR_EL0		U(0x28)
 #define CTX_IS_IN_EL3		U(0x30)
-#define CTX_EL3STATE_END	U(0x40) /* Align to the next 16 byte boundary */
+#define CTX_CPTR_EL3		U(0x38)
+#define CTX_ZCR_EL3		U(0x40)
+#define CTX_EL3STATE_END	U(0x50) /* Align to the next 16 byte boundary */
 
 /*******************************************************************************
  * Constants that allow assembler code to access members of and the
@@ -205,8 +207,8 @@
 #define CTX_MPAMVPMV_EL2	U(0x158)
 
 // Starting with Armv8.6
-#define CTX_HAFGRTR_EL2		U(0x160)
-#define CTX_HDFGRTR_EL2		U(0x168)
+#define CTX_HDFGRTR_EL2		U(0x160)
+#define CTX_HAFGRTR_EL2		U(0x168)
 #define CTX_HDFGWTR_EL2		U(0x170)
 #define CTX_HFGITR_EL2		U(0x178)
 #define CTX_HFGRTR_EL2		U(0x180)
@@ -215,19 +217,20 @@
 
 // Starting with Armv8.4
 #define CTX_CONTEXTIDR_EL2	U(0x198)
-#define CTX_SDER32_EL2		U(0x1a0)
-#define CTX_TTBR1_EL2		U(0x1a8)
-#define CTX_VDISR_EL2		U(0x1b0)
+#define CTX_TTBR1_EL2		U(0x1a0)
+#define CTX_VDISR_EL2		U(0x1a8)
+#define CTX_VSESR_EL2		U(0x1b0)
 #define CTX_VNCR_EL2		U(0x1b8)
-#define CTX_VSESR_EL2		U(0x1c0)
-#define CTX_VSTCR_EL2		U(0x1c8)
-#define CTX_VSTTBR_EL2		U(0x1d0)
-#define CTX_TRFCR_EL2		U(0x1d8)
+#define CTX_TRFCR_EL2		U(0x1c0)
 
 // Starting with Armv8.5
-#define CTX_SCXTNUM_EL2		U(0x1e0)
+#define CTX_SCXTNUM_EL2		U(0x1c8)
+
+// Register for FEAT_HCX
+#define CTX_HCRX_EL2            U(0x1d0)
+
 /* Align to the next 16 byte boundary */
-#define CTX_EL2_SYSREGS_END	U(0x1f0)
+#define CTX_EL2_SYSREGS_END	U(0x1e0)
 
 #endif /* CTX_INCLUDE_EL2_REGS */
 
@@ -399,13 +402,12 @@ DEFINE_REG_STRUCT(pauth, CTX_PAUTH_REGS_ALL);
 					 = (uint64_t) (val))
 
 /*
- * Top-level context structure which is used by EL3 firmware to
- * preserve the state of a core at EL1 in one of the two security
- * states and save enough EL3 meta data to be able to return to that
- * EL and security state. The context management library will be used
- * to ensure that SP_EL3 always points to an instance of this
- * structure at exception entry and exit. Each instance will
- * correspond to either the secure or the non-secure state.
+ * Top-level context structure which is used by EL3 firmware to preserve
+ * the state of a core at the next lower EL in a given security state and
+ * save enough EL3 meta data to be able to return to that EL and security
+ * state. The context management library will be used to ensure that
+ * SP_EL3 always points to an instance of this structure at exception
+ * entry and exit.
  */
 typedef struct cpu_context {
 	gp_regs_t gpregs_ctx;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -71,8 +71,9 @@
 	 * Save general purpose and ARMv8.3-PAuth registers (if enabled).
 	 * If Secure Cycle Counter is not disabled in MDCR_EL3 when
 	 * ARMv8.5-PMU is implemented, save PMCR_EL0 and disable Cycle Counter.
+	 * Also set the PSTATE to a known state.
 	 */
-	bl	save_gp_pmcr_pauth_regs
+	bl	prepare_el3_entry
 
 	bl	handle_lower_el_ea_esb
 
@@ -209,8 +210,9 @@ exp_from_EL3:
 	 * Save general purpose and ARMv8.3-PAuth registers (if enabled).
 	 * If Secure Cycle Counter is not disabled in MDCR_EL3 when
 	 * ARMv8.5-PMU is implemented, save PMCR_EL0 and disable Cycle Counter.
+	 * Also set the PSTATE to a known state.
 	 */
-	bl	save_gp_pmcr_pauth_regs
+	bl	prepare_el3_entry
 
 #if ENABLE_PAUTH
 	/* Load and program APIAKey firmware key */
@@ -462,8 +464,9 @@ smc_handler64:
 	 * Save general purpose and ARMv8.3-PAuth registers (if enabled).
 	 * If Secure Cycle Counter is not disabled in MDCR_EL3 when
 	 * ARMv8.5-PMU is implemented, save PMCR_EL0 and disable Cycle Counter.
+	 * Also set the PSTATE to a known state.
 	 */
-	bl	save_gp_pmcr_pauth_regs
+	bl	prepare_el3_entry
 
 #if ENABLE_PAUTH
 	/* Load and program APIAKey firmware key */
@@ -499,6 +502,21 @@ smc_handler64:
 	mrs	x18, scr_el3
 	stp	x16, x17, [x6, #CTX_EL3STATE_OFFSET + CTX_SPSR_EL3]
 	str	x18, [x6, #CTX_EL3STATE_OFFSET + CTX_SCR_EL3]
+
+	/* Clear flag register */
+	mov	x7, xzr
+
+#if ENABLE_RME
+	/* Copy SCR_EL3.NSE bit to the flag to indicate caller's security */
+	ubfx	x7, x18, #SCR_NSE_SHIFT, 1
+
+	/*
+	 * Shift copied SCR_EL3.NSE bit by 5 to create space for
+	 * SCR_EL3.NS bit. Bit 5 of the flag correspondes to
+	 * the SCR_EL3.NSE bit.
+	 */
+	lsl	x7, x7, #5
+#endif /* ENABLE_RME */
 
 	/* Copy SCR_EL3.NS bit to the flag to indicate caller's security */
 	bfi	x7, x18, #0, #1

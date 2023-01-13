@@ -1,10 +1,20 @@
 #
-# Copyright (c) 2017-2019, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2017-2022, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
+ifeq ($(STM32MP13),1)
+$(error "SP_min is not supported on STM32MP13 platform")
+endif
+
 SP_MIN_WITH_SECURE_FIQ	:=	1
+
+ifneq ($(STM32MP_USE_STM32IMAGE),1)
+override ENABLE_PIE	:=	1
+BL32_CFLAGS		+=	-fpie -DENABLE_PIE
+BL32_LDFLAGS		+=	$(PIE_LDFLAGS)
+endif
 
 BL32_CFLAGS		+=	-DSTM32MP_SHARED_RESOURCES
 
@@ -14,6 +24,10 @@ BL32_SOURCES		+=	drivers/st/etzpc/etzpc.c			\
 				plat/st/stm32mp1/stm32mp1_pm.c			\
 				plat/st/stm32mp1/stm32mp1_shared_resources.c	\
 				plat/st/stm32mp1/stm32mp1_topology.c
+
+# FDT wrappers
+include common/fdt_wrappers.mk
+BL32_SOURCES		+=	${FDT_WRAPPERS_SOURCES}
 
 # Generic GIC v2
 include drivers/arm/gic/v2/gicv2.mk

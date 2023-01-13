@@ -102,6 +102,16 @@
 /* CSSELR definitions */
 #define LEVEL_SHIFT		U(1)
 
+/* ID_DFR0_EL1 definitions */
+#define ID_DFR0_COPTRC_SHIFT		U(12)
+#define ID_DFR0_COPTRC_MASK		U(0xf)
+#define ID_DFR0_COPTRC_SUPPORTED	U(1)
+#define ID_DFR0_COPTRC_LENGTH		U(4)
+#define ID_DFR0_TRACEFILT_SHIFT		U(28)
+#define ID_DFR0_TRACEFILT_MASK		U(0xf)
+#define ID_DFR0_TRACEFILT_SUPPORTED	U(1)
+#define ID_DFR0_TRACEFILT_LENGTH	U(4)
+
 /* ID_DFR1_EL1 definitions */
 #define ID_DFR1_MTPMU_SHIFT	U(0)
 #define ID_DFR1_MTPMU_MASK	U(0xf)
@@ -111,6 +121,10 @@
 #define ID_MMFR4_CNP_SHIFT	U(12)
 #define ID_MMFR4_CNP_LENGTH	U(4)
 #define ID_MMFR4_CNP_MASK	U(0xf)
+
+#define ID_MMFR4_CCIDX_SHIFT	U(24)
+#define ID_MMFR4_CCIDX_LENGTH	U(4)
+#define ID_MMFR4_CCIDX_MASK	U(0xf)
 
 /* ID_PFR0 definitions */
 #define ID_PFR0_AMU_SHIFT	U(20)
@@ -164,7 +178,7 @@
 #define SCTLR_AFE_BIT		(U(1) << 29)
 #define SCTLR_TE_BIT		(U(1) << 30)
 #define SCTLR_DSSBS_BIT		(U(1) << 31)
-#define SCTLR_RESET_VAL         (SCTLR_RES1 | SCTLR_NTWE_BIT |		\
+#define SCTLR_RESET_VAL		(SCTLR_RES1 | SCTLR_NTWE_BIT |		\
 				SCTLR_NTWI_BIT | SCTLR_CP15BEN_BIT)
 
 /* SDCR definitions */
@@ -173,6 +187,7 @@
 #define SDCR_SPD_DISABLE	U(0x2)
 #define SDCR_SPD_ENABLE		U(0x3)
 #define SDCR_SCCD_BIT		(U(1) << 23)
+#define SDCR_TTRF_BIT		(U(1) << 19)
 #define SDCR_SPME_BIT		(U(1) << 17)
 #define SDCR_RESET_VAL		U(0x0)
 #define SDCR_MTPME_BIT		(U(1) << 28)
@@ -242,7 +257,8 @@
 /* HCPTR definitions */
 #define HCPTR_RES1		((U(1) << 13) | (U(1) << 12) | U(0x3ff))
 #define TCPAC_BIT		(U(1) << 31)
-#define TAM_BIT			(U(1) << 30)
+#define TAM_SHIFT		U(30)
+#define TAM_BIT			(U(1) << TAM_SHIFT)
 #define TTA_BIT			(U(1) << 20)
 #define TCP11_BIT		(U(1) << 11)
 #define TCP10_BIT		(U(1) << 10)
@@ -283,7 +299,7 @@
 #define CPACR_CP10_SHIFT	U(20)
 #define CPACR_ENABLE_FP_ACCESS	((U(0x3) << CPACR_CP11_SHIFT) |\
 				 (U(0x3) << CPACR_CP10_SHIFT))
-#define CPACR_RESET_VAL         U(0x0)
+#define CPACR_RESET_VAL		U(0x0)
 
 /* FPEXC definitions */
 #define FPEXC_RES1		((U(1) << 10) | (U(1) << 9) | (U(1) << 8))
@@ -483,13 +499,13 @@
 #define CNTP_CTL		U(0x2c)
 
 /* Physical timer control register bit fields shifts and masks */
-#define CNTP_CTL_ENABLE_SHIFT   0
-#define CNTP_CTL_IMASK_SHIFT    1
-#define CNTP_CTL_ISTATUS_SHIFT  2
+#define CNTP_CTL_ENABLE_SHIFT	0
+#define CNTP_CTL_IMASK_SHIFT	1
+#define CNTP_CTL_ISTATUS_SHIFT	2
 
-#define CNTP_CTL_ENABLE_MASK    U(1)
-#define CNTP_CTL_IMASK_MASK     U(1)
-#define CNTP_CTL_ISTATUS_MASK   U(1)
+#define CNTP_CTL_ENABLE_MASK	U(1)
+#define CNTP_CTL_IMASK_MASK	U(1)
+#define CNTP_CTL_ISTATUS_MASK	U(1)
 
 /* MAIR macros */
 #define MAIR0_ATTR_SET(attr, index)	((attr) << ((index) << U(3)))
@@ -516,6 +532,7 @@
 #define CTR		p15, 0, c0, c0, 1
 #define CNTFRQ		p15, 0, c14, c0, 0
 #define ID_MMFR4	p15, 0, c0, c2, 6
+#define ID_DFR0		p15, 0, c0, c1, 2
 #define ID_DFR1		p15, 0, c0, c3, 5
 #define ID_PFR0		p15, 0, c0, c1, 0
 #define ID_PFR1		p15, 0, c0, c1, 1
@@ -546,6 +563,7 @@
 #define CLIDR		p15, 1, c0, c0, 1
 #define CSSELR		p15, 2, c0, c0, 0
 #define CCSIDR		p15, 1, c0, c0, 0
+#define CCSIDR2		p15, 1, c0, c0, 2
 #define HTCR		p15, 4, c2, c0, 2
 #define HMAIR0		p15, 4, c10, c2, 0
 #define ATS1CPR		p15, 0, c7, c8, 0
@@ -715,8 +733,25 @@
 #define AMEVTYPER1E	p15, 0, c13, c15, 6
 #define AMEVTYPER1F	p15, 0, c13, c15, 7
 
+/* AMCNTENSET0 definitions */
+#define AMCNTENSET0_Pn_SHIFT	U(0)
+#define AMCNTENSET0_Pn_MASK	U(0xffff)
+
+/* AMCNTENSET1 definitions */
+#define AMCNTENSET1_Pn_SHIFT	U(0)
+#define AMCNTENSET1_Pn_MASK	U(0xffff)
+
+/* AMCNTENCLR0 definitions */
+#define AMCNTENCLR0_Pn_SHIFT	U(0)
+#define AMCNTENCLR0_Pn_MASK	U(0xffff)
+
+/* AMCNTENCLR1 definitions */
+#define AMCNTENCLR1_Pn_SHIFT	U(0)
+#define AMCNTENCLR1_Pn_MASK	U(0xffff)
+
 /* AMCR definitions */
-#define AMCR_CG1RZ_BIT		(ULL(1) << 17)
+#define AMCR_CG1RZ_SHIFT	U(17)
+#define AMCR_CG1RZ_BIT		(ULL(1) << AMCR_CG1RZ_SHIFT)
 
 /* AMCFGR definitions */
 #define AMCFGR_NCG_SHIFT	U(28)
@@ -725,6 +760,8 @@
 #define AMCFGR_N_MASK		U(0xff)
 
 /* AMCGCR definitions */
+#define AMCGCR_CG0NC_SHIFT	U(0)
+#define AMCGCR_CG0NC_MASK	U(0xff)
 #define AMCGCR_CG1NC_SHIFT	U(8)
 #define AMCGCR_CG1NC_MASK	U(0xff)
 

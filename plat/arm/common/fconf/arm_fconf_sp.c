@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2020-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -30,13 +30,16 @@ int fconf_populate_arm_sp(uintptr_t config)
 	union uuid_helper_t uuid_helper;
 	unsigned int index = 0;
 	uint32_t val32;
-	bool is_plat_owned = false;
 	const unsigned int sip_start = SP_PKG1_ID;
 	unsigned int sip_index = sip_start;
+#if defined(ARM_COT_dualroot)
 	const unsigned int sip_end = sip_start + MAX_SP_IDS / 2;
+	/* Allocating index range for platform SPs */
 	const unsigned int plat_start = SP_PKG5_ID;
 	unsigned int plat_index = plat_start;
 	const unsigned int plat_end = plat_start + MAX_SP_IDS / 2;
+	bool is_plat_owned = false;
+#endif /* ARM_COT_dualroot */
 
 	/* As libfdt use void *, we can't avoid this cast */
 	const void *dtb = (void *)config;
@@ -51,11 +54,17 @@ int fconf_populate_arm_sp(uintptr_t config)
 	}
 
 	fdt_for_each_subnode(sp_node, dtb, node) {
-		if ((index == MAX_SP_IDS) || (sip_index == sip_end)
-		    || (plat_index == plat_end)) {
+		if (index == MAX_SP_IDS) {
 			ERROR("FCONF: Reached max number of SPs\n");
 			return -1;
 		}
+
+#if defined(ARM_COT_dualroot)
+		if ((sip_index == sip_end) || (plat_index == plat_end)) {
+			ERROR("FCONF: Reached max number of plat/SiP SPs\n");
+			return -1;
+		}
+#endif /* ARM_COT_dualroot */
 
 		/* Read UUID */
 		err = fdtw_read_uuid(dtb, sp_node, "uuid", 16,
@@ -66,6 +75,15 @@ int fconf_populate_arm_sp(uintptr_t config)
 		}
 
 		arm_sp.uuids[index] = uuid_helper;
+
+		/* Read Load address */
+		err = fdt_read_uint32(dtb, sp_node, "load-address", &val32);
+		if (err < 0) {
+			ERROR("FCONF: cannot read SP load address\n");
+			return -1;
+		}
+		arm_sp.load_addr[index] = val32;
+
 		VERBOSE("FCONF: %s UUID"
 			" %02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
 			" load_addr=%lx\n",
@@ -82,20 +100,12 @@ int fconf_populate_arm_sp(uintptr_t config)
 			uuid_helper.uuid_struct.node[4], uuid_helper.uuid_struct.node[5],
 			arm_sp.load_addr[index]);
 
-		/* Read Load address */
-		err = fdt_read_uint32(dtb, sp_node, "load-address", &val32);
-		if (err < 0) {
-			ERROR("FCONF: cannot read SP load address\n");
-			return -1;
-		}
-		arm_sp.load_addr[index] = val32;
-
 		/* Read owner field only for dualroot CoT */
 #if defined(ARM_COT_dualroot)
 		/* Owner is an optional field, no need to catch error */
 		fdtw_read_string(dtb, sp_node, "owner",
 				arm_sp.owner[index], ARM_SP_OWNER_NAME_LEN);
-#endif
+
 		/* If owner is empty mark it as SiP owned */
 		if ((strncmp(arm_sp.owner[index], "SiP",
 			     ARM_SP_OWNER_NAME_LEN) == 0) ||
@@ -120,7 +130,9 @@ int fconf_populate_arm_sp(uintptr_t config)
 			policies[plat_index].dev_handle = &fip_dev_handle;
 			policies[plat_index].check = open_fip;
 			plat_index++;
-		} else {
+		} else
+#endif /* ARM_COT_dualroot */
+		{
 			sp_mem_params_descs[index].image_id = sip_index;
 			policies[sip_index].image_spec =
 						(uintptr_t)&arm_sp.uuids[index];

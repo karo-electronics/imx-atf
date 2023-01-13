@@ -26,6 +26,13 @@ tables. The details of this library can be found in
 
 TF-A can be built to support either AArch64 or AArch32 execution state.
 
+.. note::
+
+ The descriptions in this chapter are for the Arm TrustZone architecture.
+ For changes to the firmware design for the
+ `Arm Confidential Compute Architecture (Arm CCA)`_ please refer to the
+ chapter :ref:`Realm Management Extension (RME)`.
+
 Cold boot
 ---------
 
@@ -124,6 +131,9 @@ convention:
    -  For other BL3x images, if the firmware configuration file is loaded by
       BL2, then its address is passed in ``arg0`` and if HW_CONFIG is loaded
       then its address is passed in ``arg1``.
+   -  In case of the Arm FVP platform, FW_CONFIG address passed in ``arg1`` to
+      BL31/SP_MIN, and the SOC_FW_CONFIG and HW_CONFIG details are retrieved
+      from FW_CONFIG device tree.
 
 BL1
 ~~~
@@ -1750,11 +1760,19 @@ BL image during boot.
                    DRAM
     0xffffffff +----------+
                :          :
-               |----------|
+    0x82100000 |----------|
                |HW_CONFIG |
-    0x83000000 |----------|  (non-secure)
+    0x82000000 |----------|  (non-secure)
                |          |
     0x80000000 +----------+
+
+               Trusted DRAM
+    0x08000000 +----------+
+               |HW_CONFIG |
+    0x07f00000 |----------|
+               :          :
+               |          |
+    0x06000000 +----------+
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  +----------------+
@@ -1783,15 +1801,18 @@ BL image during boot.
                      DRAM
     0xffffffff +--------------+
                :              :
-               |--------------|
+    0x82100000 |--------------|
                |  HW_CONFIG   |
-    0x83000000 |--------------|  (non-secure)
+    0x82000000 |--------------|  (non-secure)
                |              |
     0x80000000 +--------------+
 
-                Trusted DRAM
+                 Trusted DRAM
     0x08000000 +--------------+
-               |     BL32     |
+               |  HW_CONFIG   |
+    0x07f00000 |--------------|
+               :              :
+               |    BL32      |
     0x06000000 +--------------+
 
                  Trusted SRAM
@@ -1822,11 +1843,19 @@ BL image during boot.
                |  BL32    |  (secure)
     0xff000000 +----------+
                |          |
-               |----------|
+    0x82100000 |----------|
                |HW_CONFIG |
-    0x83000000 |----------|  (non-secure)
+    0x82000000 |----------|  (non-secure)
                |          |
     0x80000000 +----------+
+
+               Trusted DRAM
+    0x08000000 +----------+
+               |HW_CONFIG |
+    0x7f000000 |----------|
+               :          :
+               |          |
+    0x06000000 +----------+
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  +----------------+
@@ -2616,8 +2645,6 @@ Armv8.3-A
    ``CTX_INCLUDE_PAUTH_REGS`` to 1. This enables pointer authentication in BL1,
    BL2, BL31, and the TSP if it is used.
 
-   These options are experimental features.
-
    Note that Pointer Authentication is enabled for Non-secure world irrespective
    of the value of these build flags if the CPU supports it.
 
@@ -2629,8 +2656,7 @@ Armv8.5-A
 ~~~~~~~~~
 
 -  Branch Target Identification feature is selected by ``BRANCH_PROTECTION``
-   option set to 1. This option defaults to 0 and this is an experimental
-   feature.
+   option set to 1. This option defaults to 0.
 
 -  Memory Tagging Extension feature is unconditionally enabled for both worlds
    (at EL0 and S-EL0) if it is only supported at EL0. If instead it is
@@ -2725,7 +2751,7 @@ kernel at boot time. These can be found in the ``fdts`` directory.
 
 --------------
 
-*Copyright (c) 2013-2020, Arm Limited and Contributors. All rights reserved.*
+*Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.*
 
 .. _Power State Coordination Interface PDD: http://infocenter.arm.com/help/topic/com.arm.doc.den0022d/Power_State_Coordination_Interface_PDD_v1_1_DEN0022D.pdf
 .. _SMCCC: https://developer.arm.com/docs/den0028/latest
@@ -2734,5 +2760,6 @@ kernel at boot time. These can be found in the ``fdts`` directory.
 .. _Arm ARM: https://developer.arm.com/docs/ddi0487/latest
 .. _SMC Calling Convention: https://developer.arm.com/docs/den0028/latest
 .. _Trusted Board Boot Requirements CLIENT (TBBR-CLIENT) Armv8-A (ARM DEN0006D): https://developer.arm.com/docs/den0006/latest/trusted-board-boot-requirements-client-tbbr-client-armv8-a
+.. _Arm Confidential Compute Architecture (Arm CCA): https://www.arm.com/why-arm/architecture/security-features/arm-confidential-compute-architecture
 
 .. |Image 1| image:: ../resources/diagrams/rt-svc-descs-layout.png

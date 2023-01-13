@@ -5,6 +5,8 @@
  */
 
 #include <assert.h>
+#include <inttypes.h>
+#include <stdint.h>
 
 #include <arch_helpers.h>
 #include <common/debug.h>
@@ -121,10 +123,11 @@ static int get_fsbl_endian(const struct xfsbl_partition *partition)
 
 	flags >>= FSBL_FLAGS_ENDIAN_SHIFT;
 
-	if (flags == FSBL_FLAGS_ENDIAN_BE)
+	if (flags == FSBL_FLAGS_ENDIAN_BE) {
 		return SPSR_E_BIG;
-	else
+	} else {
 		return SPSR_E_LITTLE;
+	}
 }
 
 /**
@@ -170,12 +173,12 @@ enum fsbl_handoff fsbl_atf_handover(entry_point_info_t *bl32,
 	    (ATFHandoffParams->magic[1] != 'L') ||
 	    (ATFHandoffParams->magic[2] != 'N') ||
 	    (ATFHandoffParams->magic[3] != 'X')) {
-		ERROR("BL31: invalid ATF handoff structure at %llx\n",
+		ERROR("BL31: invalid ATF handoff structure at %" PRIx64 "\n",
 		      atf_handoff_addr);
 		return FSBL_HANDOFF_INVAL_STRUCT;
 	}
 
-	VERBOSE("BL31: ATF handoff params at:0x%llx, entries:%u\n",
+	VERBOSE("BL31: ATF handoff params at:0x%" PRIx64 ", entries:%u\n",
 		atf_handoff_addr, ATFHandoffParams->num_entries);
 	if (ATFHandoffParams->num_entries > FSBL_MAX_PARTITIONS) {
 		ERROR("BL31: ATF handoff params: too many partitions (%u/%u)\n",
@@ -193,7 +196,7 @@ enum fsbl_handoff fsbl_atf_handover(entry_point_info_t *bl32,
 		int target_estate, target_secure;
 		int target_cpu, target_endianness, target_el;
 
-		VERBOSE("BL31: %zd: entry:0x%llx, flags:0x%llx\n", i,
+		VERBOSE("BL31: %zd: entry:0x%" PRIx64 ", flags:0x%" PRIx64 "\n", i,
 			ATFHandoffParams->partition[i].entry_point,
 			ATFHandoffParams->partition[i].flags);
 
@@ -224,46 +227,50 @@ enum fsbl_handoff fsbl_atf_handover(entry_point_info_t *bl32,
 		if (target_secure == FSBL_FLAGS_SECURE) {
 			image = bl32;
 
-			if (target_estate == FSBL_FLAGS_ESTATE_A32)
+			if (target_estate == FSBL_FLAGS_ESTATE_A32) {
 				bl32->spsr = SPSR_MODE32(MODE32_svc, SPSR_T_ARM,
 							 target_endianness,
 							 DISABLE_ALL_EXCEPTIONS);
-			else
+			} else {
 				bl32->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX,
 						     DISABLE_ALL_EXCEPTIONS);
+			}
 		} else {
 			image = bl33;
 
 			if (target_estate == FSBL_FLAGS_ESTATE_A32) {
-				if (target_el == FSBL_FLAGS_EL2)
+				if (target_el == FSBL_FLAGS_EL2) {
 					target_el = MODE32_hyp;
-				else
+				} else {
 					target_el = MODE32_sys;
+				}
 
 				bl33->spsr = SPSR_MODE32(target_el, SPSR_T_ARM,
 							 target_endianness,
 							 DISABLE_ALL_EXCEPTIONS);
 			} else {
-				if (target_el == FSBL_FLAGS_EL2)
+				if (target_el == FSBL_FLAGS_EL2) {
 					target_el = MODE_EL2;
-				else
+				} else {
 					target_el = MODE_EL1;
+				}
 
 				bl33->spsr = SPSR_64(target_el, MODE_SP_ELX,
 						     DISABLE_ALL_EXCEPTIONS);
 			}
 		}
 
-		VERBOSE("Setting up %s entry point to:%llx, el:%x\n",
+		VERBOSE("Setting up %s entry point to:%" PRIx64 ", el:%x\n",
 			target_secure == FSBL_FLAGS_SECURE ? "BL32" : "BL33",
 			ATFHandoffParams->partition[i].entry_point,
 			target_el);
 		image->pc = ATFHandoffParams->partition[i].entry_point;
 
-		if (target_endianness == SPSR_E_BIG)
+		if (target_endianness == SPSR_E_BIG) {
 			EP_SET_EE(image->h.attr, EP_EE_BIG);
-		else
+		} else {
 			EP_SET_EE(image->h.attr, EP_EE_LITTLE);
+		}
 	}
 
 	return FSBL_HANDOFF_SUCCESS;

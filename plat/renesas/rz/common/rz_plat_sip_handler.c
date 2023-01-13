@@ -16,8 +16,9 @@
 #include <rzg2l_def.h>
 #include <rz_sip_svc.h>
 
-#define RZ_OTP_BASE_DEVID 	(RZG2L_OTP_BASE + 0x1178)
-#define RZ_OTP_BASE_CHIPID 	(RZG2L_OTP_BASE + 0x1140)
+#define RZ_SYS_BASE_DEVID	(RZG2L_SYSC_BASE + 0x0A04)
+#define RZ_OTP_BASE_DEVID	(RZG2L_OTP_BASE + 0x1178)
+#define RZ_OTP_BASE_CHIPID	(RZG2L_OTP_BASE + 0x1140)
 #define RZ_OTP_PWR 		RZG2L_OTP_BASE
 #define RZ_OTP_STR 		(RZG2L_OTP_BASE + 0x0004)
 #define RZ_OTP_STAWR 		(RZG2L_OTP_BASE + 0x0008)
@@ -37,8 +38,9 @@
 
 static uintptr_t rz_otp_handler_devid(void *handle, u_register_t x1)
 {
-	uint32_t devid = mmio_read_32(RZ_OTP_BASE_DEVID);
-	SMC_RET1(handle, devid);
+	uint32_t devid_1 = mmio_read_32(RZ_OTP_BASE_DEVID);
+	uint32_t devid_2 = mmio_read_32(RZ_SYS_BASE_DEVID);
+	SMC_RET2(handle, devid_1, devid_2);
 }
 
 static uintptr_t rz_otp_handler_chipid(void *handle, u_register_t x1, u_register_t flags)
@@ -229,6 +231,7 @@ uintptr_t rz_plat_sip_handler(uint32_t smc_fid,
 	uint32_t fuse;
 
 	switch (smc_fid) {
+
 		case RZ_SIP_SVC_GET_DEVID:
 			return rz_otp_handler_devid(handle, x1);
 		case RZ_SIP_SVC_GET_CHIPID:

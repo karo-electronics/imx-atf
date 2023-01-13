@@ -6,6 +6,9 @@ cores provide high-performance computing, power efficiency, enhanced system
 reliability and embedded security needed to drive the growth of fast-growing
 edge node computing, streaming multimedia, and machine learning applications.
 
+imx8mq is dropped in TF-A CI build due to the small OCRAM size, but still actively
+maintained in NXP official release.
+
 Boot Sequence
 -------------
 
@@ -57,3 +60,11 @@ BL2 will be in the FIT image and SPL will verify it.
 All of the BL3x will be put in the FIP image. BL2 will verify them.
 In U-boot we turn on the UEFI secure boot features so it can verify
 grub. And we use grub to verify linux kernel.
+
+Measured Boot
+-------------
+
+When setting MEASURED_BOOT=1 on imx8mm we can let TF-A generate event logs
+with a DTB overlay. The overlay will be put at PLAT_IMX8M_DTO_BASE with
+maximum size PLAT_IMX8M_DTO_MAX_SIZE. Then in U-boot we can apply the DTB
+overlay and let U-boot to parse the event log and update the PCRs.

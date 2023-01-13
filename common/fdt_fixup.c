@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -394,10 +394,115 @@ int fdt_add_cpus_node(void *dtb, unsigned int afflv0,
 	return offs;
 }
 
+/*******************************************************************************
+ * fdt_add_cpu_idle_states() - add PSCI CPU idle states to cpu nodes in the DT
+ * @dtb:	pointer to the device tree blob in memory
+ * @states:	array of idle state descriptions, ending with empty element
+ *
+ * Add information about CPU idle states to the devicetree. This function
+ * assumes that CPU idle states are not already present in the devicetree, and
+ * that all CPU states are equally applicable to all CPUs.
+ *
+ * See arm/idle-states.yaml and arm/psci.yaml in the (Linux kernel) DT binding
+ * documentation for more details.
+ *
+ * Return: 0 on success, a negative error value otherwise.
+ ******************************************************************************/
+int fdt_add_cpu_idle_states(void *dtb, const struct psci_cpu_idle_state *state)
+{
+	int cpu_node, cpus_node, idle_states_node, ret;
+	uint32_t count, phandle;
+
+	ret = fdt_find_max_phandle(dtb, &phandle);
+	phandle++;
+	if (ret < 0) {
+		return ret;
+	}
+
+	cpus_node = fdt_path_offset(dtb, "/cpus");
+	if (cpus_node < 0) {
+		return cpus_node;
+	}
+
+	/* Create the idle-states node and its child nodes. */
+	idle_states_node = fdt_add_subnode(dtb, cpus_node, "idle-states");
+	if (idle_states_node < 0) {
+		return idle_states_node;
+	}
+
+	ret = fdt_setprop_string(dtb, idle_states_node, "entry-method", "psci");
+	if (ret < 0) {
+		return ret;
+	}
+
+	for (count = 0U; state->name != NULL; count++, phandle++, state++) {
+		int idle_state_node;
+
+		idle_state_node = fdt_add_subnode(dtb, idle_states_node,
+						  state->name);
+		if (idle_state_node < 0) {
+			return idle_state_node;
+		}
+
+		fdt_setprop_string(dtb, idle_state_node, "compatible",
+				   "arm,idle-state");
+		fdt_setprop_u32(dtb, idle_state_node, "arm,psci-suspend-param",
+				state->power_state);
+		if (state->local_timer_stop) {
+			fdt_setprop_empty(dtb, idle_state_node,
+					  "local-timer-stop");
+		}
+		fdt_setprop_u32(dtb, idle_state_node, "entry-latency-us",
+				state->entry_latency_us);
+		fdt_setprop_u32(dtb, idle_state_node, "exit-latency-us",
+				state->exit_latency_us);
+		fdt_setprop_u32(dtb, idle_state_node, "min-residency-us",
+				state->min_residency_us);
+		if (state->wakeup_latency_us) {
+			fdt_setprop_u32(dtb, idle_state_node,
+					"wakeup-latency-us",
+					state->wakeup_latency_us);
+		}
+		fdt_setprop_u32(dtb, idle_state_node, "phandle", phandle);
+	}
+
+	if (count == 0U) {
+		return 0;
+	}
+
+	/* Link each cpu node to the idle state nodes. */
+	fdt_for_each_subnode(cpu_node, dtb, cpus_node) {
+		const char *device_type;
+		fdt32_t *value;
+
+		/* Only process child nodes with device_type = "cpu". */
+		device_type = fdt_getprop(dtb, cpu_node, "device_type", NULL);
+		if (device_type == NULL || strcmp(device_type, "cpu") != 0) {
+			continue;
+		}
+
+		/* Allocate space for the list of phandles. */
+		ret = fdt_setprop_placeholder(dtb, cpu_node, "cpu-idle-states",
+					      count * sizeof(phandle),
+					      (void **)&value);
+		if (ret < 0) {
+			return ret;
+		}
+
+		/* Fill in the phandles of the idle state nodes. */
+		for (uint32_t i = 0U; i < count; ++i) {
+			value[i] = cpu_to_fdt32(phandle - count + i);
+		}
+	}
+
+	return 0;
+}
+
 /**
  * fdt_adjust_gic_redist() - Adjust GICv3 redistributor size
  * @dtb: Pointer to the DT blob in memory
  * @nr_cores: Number of CPU cores on this system.
+ * @gicr_base: Base address of the first GICR frame, or ~0 if unchanged
  * @gicr_frame_size: Size of the GICR frame per core
  *
  * On a GICv3 compatible interrupt controller, the redistributor provides
@@ -410,17 +515,19 @@ int fdt_add_cpus_node(void *dtb, unsigned int afflv0,
  * A GICv4 compatible redistributor uses four 64K pages per core, whereas GICs
  * without support for direct injection of virtual interrupts use two 64K pages.
  * The @gicr_frame_size parameter should be 262144 and 131072, respectively.
+ * Also optionally allow adjusting the GICR frame base address, when this is
+ * different due to ITS frames between distributor and redistributor.
  *
  * Return: 0 on success, negative error value otherwise.
  */
 int fdt_adjust_gic_redist(void *dtb, unsigned int nr_cores,
-			  unsigned int gicr_frame_size)
+			  uintptr_t gicr_base, unsigned int gicr_frame_size)
 {
 	int offset = fdt_node_offset_by_compatible(dtb, 0, "arm,gic-v3");
-	uint64_t redist_size_64;
-	uint32_t redist_size_32;
+	uint64_t reg_64;
+	uint32_t reg_32;
 	void *val;
-	int parent;
+	int parent, ret;
 	int ac, sc;
 
 	if (offset < 0) {
@@ -437,13 +544,34 @@ int fdt_adjust_gic_redist(void *dtb, unsigned int nr_cores,
 		return -EINVAL;
 	}
 
+	if (gicr_base != INVALID_BASE_ADDR) {
+		if (ac == 1) {
+			reg_32 = cpu_to_fdt32(gicr_base);
+			val = &reg_32;
+		} else {
+			reg_64 = cpu_to_fdt64(gicr_base);
+			val = &reg_64;
+		}
+		/*
+		 * The redistributor base address is the second address in
+		 * the "reg" entry, so we have to skip one address and one
+		 * size cell.
+		 */
+		ret = fdt_setprop_inplace_namelen_partial(dtb, offset,
+							  "reg", 3,
+							  (ac + sc) * 4,
+							  val, ac * 4);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
 	if (sc == 1) {
-		redist_size_32 = cpu_to_fdt32(nr_cores * gicr_frame_size);
-		val = &redist_size_32;
+		reg_32 = cpu_to_fdt32(nr_cores * gicr_frame_size);
+		val = &reg_32;
 	} else {
-		redist_size_64 = cpu_to_fdt64(nr_cores *
-					      (uint64_t)gicr_frame_size);
-		val = &redist_size_64;
+		reg_64 = cpu_to_fdt64(nr_cores * (uint64_t)gicr_frame_size);
+		val = &reg_64;
 	}
 
 	/*

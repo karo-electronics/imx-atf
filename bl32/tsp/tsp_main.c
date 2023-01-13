@@ -1,10 +1,12 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
+#include <inttypes.h>
+#include <stdint.h>
 
 #include <arch_features.h>
 #include <arch_helpers.h>
@@ -271,7 +273,7 @@ tsp_args_t *tsp_cpu_resume_main(uint64_t max_off_pwrlvl,
 
 #if LOG_LEVEL >= LOG_LEVEL_INFO
 	spin_lock(&console_lock);
-	INFO("TSP: cpu 0x%lx resumed. maximum off power level %lld\n",
+	INFO("TSP: cpu 0x%lx resumed. maximum off power level %" PRId64 "\n",
 	     read_mpidr(), max_off_pwrlvl);
 	INFO("TSP: cpu 0x%lx: %d smcs, %d erets %d cpu resume requests\n",
 		read_mpidr(),
@@ -368,6 +370,7 @@ tsp_args_t *tsp_smc_handler(uint64_t func,
 	uint64_t service_arg1;
 	uint64_t results[2];
 	uint32_t linear_id = plat_my_core_pos();
+	u_register_t dit;
 
 	/* Update this cpu's statistics */
 	tsp_stats[linear_id].smc_count++;
@@ -375,7 +378,7 @@ tsp_args_t *tsp_smc_handler(uint64_t func,
 
 #if LOG_LEVEL >= LOG_LEVEL_INFO
 	spin_lock(&console_lock);
-	INFO("TSP: cpu 0x%lx received %s smc 0x%llx\n", read_mpidr(),
+	INFO("TSP: cpu 0x%lx received %s smc 0x%" PRIx64 "\n", read_mpidr(),
 		((func >> 31) & 1) == 1 ? "fast" : "yielding",
 		func);
 	INFO("TSP: cpu 0x%lx: %d smcs, %d erets\n", read_mpidr(),
@@ -421,6 +424,23 @@ tsp_args_t *tsp_smc_handler(uint64_t func,
 	case TSP_DIV:
 		results[0] /= service_arg0 ? service_arg0 : 1;
 		results[1] /= service_arg1 ? service_arg1 : 1;
+		break;
+	case TSP_CHECK_DIT:
+		if (!is_armv8_4_dit_present()) {
+#if LOG_LEVEL >= LOG_LEVEL_ERROR
+			spin_lock(&console_lock);
+			ERROR("DIT not supported\n");
+			spin_unlock(&console_lock);
+#endif
+			results[0] = 0;
+			results[1] = 0xffff;
+			break;
+		}
+		dit = read_dit();
+		results[0] = dit == service_arg0;
+		results[1] = dit;
+		/* Toggle the dit bit */
+		write_dit(service_arg0 != 0U ? 0 : DIT_BIT);
 		break;
 	default:
 		break;

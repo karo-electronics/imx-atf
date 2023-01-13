@@ -97,6 +97,14 @@ static void sq_power_down_common(const psci_power_state_t *target_state)
 void sq_pwr_domain_off(const psci_power_state_t *target_state)
 {
 #if SQ_USE_SCMI_DRIVER
+	/* Prevent interrupts from spuriously waking up this cpu */
+	sq_gic_cpuif_disable();
+
+	/* Cluster is to be turned off, so disable coherency */
+	if (SQ_CLUSTER_PWR_STATE(target_state) == SQ_LOCAL_STATE_OFF) {
+		plat_sq_interconnect_exit_coherency();
+	}
+
 	sq_scmi_off(target_state);
 #else
 	sq_power_down_common(target_state);
@@ -105,6 +113,9 @@ void sq_pwr_domain_off(const psci_power_state_t *target_state)
 
 void __dead2 sq_system_off(void)
 {
+#if SQ_USE_SCMI_DRIVER
+	sq_scmi_sys_shutdown();
+#else
 	volatile uint32_t *gpio = (uint32_t *)PLAT_SQ_GPIO_BASE;
 
 	/* set PD[9] high to power off the system */
@@ -131,6 +142,7 @@ void __dead2 sq_system_off(void)
 	wfi();
 	ERROR("SQ System Off: operation not handled.\n");
 	panic();
+#endif
 }
 
 void __dead2 sq_system_reset(void)

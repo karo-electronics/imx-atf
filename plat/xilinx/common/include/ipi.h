@@ -47,7 +47,7 @@ struct ipi_config {
  ********************************************************************/
 
 /* Initialize IPI configuration table */
-void ipi_config_table_init(const struct ipi_config *ipi_table,
+void ipi_config_table_init(const struct ipi_config *ipi_config_table,
 			   uint32_t total_ipi);
 
 /* Validate IPI mailbox access */
@@ -63,7 +63,7 @@ void ipi_mb_release(uint32_t local, uint32_t remote);
 int ipi_mb_enquire_status(uint32_t local, uint32_t remote);
 
 /* Trigger notification on the IPI mailbox */
-int ipi_mb_notify(uint32_t local, uint32_t remote, uint32_t is_blocking);
+void ipi_mb_notify(uint32_t local, uint32_t remote, uint32_t is_blocking);
 
 /* Ack IPI mailbox notification */
 void ipi_mb_ack(uint32_t local, uint32_t remote);

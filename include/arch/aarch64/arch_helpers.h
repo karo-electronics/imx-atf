@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -224,6 +224,7 @@ DEFINE_SYSOP_TYPE_PARAM_FUNC(at, s1e3r)
 DEFINE_SYSOP_PARAM_FUNC(xpaci)
 
 void flush_dcache_range(uintptr_t addr, size_t size);
+void flush_dcache_to_popa_range(uintptr_t addr, size_t size);
 void clean_dcache_range(uintptr_t addr, size_t size);
 void inv_dcache_range(uintptr_t addr, size_t size);
 bool is_dcache_enabled(void);
@@ -233,8 +234,10 @@ void dcsw_op_all(u_register_t op_type);
 
 void disable_mmu_el1(void);
 void disable_mmu_el3(void);
+void disable_mpu_el2(void);
 void disable_mmu_icache_el1(void);
 void disable_mmu_icache_el3(void);
+void disable_mpu_icache_el2(void);
 
 /*******************************************************************************
  * Misc. accessor prototypes
@@ -272,8 +275,10 @@ DEFINE_SYSOP_TYPE_FUNC(dmb, sy)
 DEFINE_SYSOP_TYPE_FUNC(dmb, st)
 DEFINE_SYSOP_TYPE_FUNC(dmb, ld)
 DEFINE_SYSOP_TYPE_FUNC(dsb, ish)
+DEFINE_SYSOP_TYPE_FUNC(dsb, osh)
 DEFINE_SYSOP_TYPE_FUNC(dsb, nsh)
 DEFINE_SYSOP_TYPE_FUNC(dsb, ishst)
+DEFINE_SYSOP_TYPE_FUNC(dsb, oshst)
 DEFINE_SYSOP_TYPE_FUNC(dmb, oshld)
 DEFINE_SYSOP_TYPE_FUNC(dmb, oshst)
 DEFINE_SYSOP_TYPE_FUNC(dmb, osh)
@@ -440,6 +445,8 @@ DEFINE_SYSREG_RW_FUNCS(cntp_cval_el0)
 DEFINE_SYSREG_READ_FUNC(cntpct_el0)
 DEFINE_SYSREG_RW_FUNCS(cnthctl_el2)
 
+DEFINE_SYSREG_RW_FUNCS(vtcr_el2)
+
 #define get_cntp_ctl_enable(x)  (((x) >> CNTP_CTL_ENABLE_SHIFT) & \
 					CNTP_CTL_ENABLE_MASK)
 #define get_cntp_ctl_imask(x)   (((x) >> CNTP_CTL_IMASK_SHIFT) & \
@@ -505,6 +512,9 @@ DEFINE_RENAME_SYSREG_RW_FUNCS(pmblimitr_el1, PMBLIMITR_EL1)
 DEFINE_RENAME_SYSREG_WRITE_FUNC(zcr_el3, ZCR_EL3)
 DEFINE_RENAME_SYSREG_WRITE_FUNC(zcr_el2, ZCR_EL2)
 
+DEFINE_RENAME_SYSREG_READ_FUNC(id_aa64smfr0_el1, ID_AA64SMFR0_EL1)
+DEFINE_RENAME_SYSREG_RW_FUNCS(smcr_el3, SMCR_EL3)
+
 DEFINE_RENAME_SYSREG_READ_FUNC(erridr_el1, ERRIDR_EL1)
 DEFINE_RENAME_SYSREG_WRITE_FUNC(errselr_el1, ERRSELR_EL1)
 
@@ -522,6 +532,9 @@ DEFINE_RENAME_SYSREG_READ_FUNC(id_aa64mmfr2_el1, ID_AA64MMFR2_EL1)
 DEFINE_RENAME_SYSREG_RW_FUNCS(apiakeyhi_el1, APIAKeyHi_EL1)
 DEFINE_RENAME_SYSREG_RW_FUNCS(apiakeylo_el1, APIAKeyLo_EL1)
 
+/* Armv8.4 Data Independent Timing Register */
+DEFINE_RENAME_SYSREG_RW_FUNCS(dit, DIT)
+
 /* Armv8.5 MTE Registers */
 DEFINE_RENAME_SYSREG_RW_FUNCS(tfsre0_el1, TFSRE0_EL1)
 DEFINE_RENAME_SYSREG_RW_FUNCS(tfsr_el1, TFSR_EL1)
@@ -532,8 +545,19 @@ DEFINE_RENAME_SYSREG_RW_FUNCS(gcr_el1, GCR_EL1)
 DEFINE_SYSREG_READ_FUNC(rndr)
 DEFINE_SYSREG_READ_FUNC(rndrrs)
 
+/* FEAT_HCX Register */
+DEFINE_RENAME_SYSREG_RW_FUNCS(hcrx_el2, HCRX_EL2)
+
 /* DynamIQ Shared Unit power management */
 DEFINE_RENAME_SYSREG_RW_FUNCS(clusterpwrdn_el1, CLUSTERPWRDN_EL1)
+
+/* CPU Power/Performance Management registers */
+DEFINE_RENAME_SYSREG_RW_FUNCS(cpuppmcr_el3, CPUPPMCR_EL3)
+DEFINE_RENAME_SYSREG_RW_FUNCS(cpumpmmcr_el3, CPUMPMMCR_EL3)
+
+/* Armv9.2 RME Registers */
+DEFINE_RENAME_SYSREG_RW_FUNCS(gptbr_el3, GPTBR_EL3)
+DEFINE_RENAME_SYSREG_RW_FUNCS(gpccr_el3, GPCCR_EL3)
 
 #define IS_IN_EL(x) \
 	(GET_EL(read_CurrentEl()) == MODE_EL##x)
@@ -578,7 +602,27 @@ static inline uint64_t el_implemented(unsigned int el)
 	}
 }
 
-/* Previously defined accesor functions with incomplete register names  */
+/*
+ * TLBIPAALLOS instruction
+ * (TLB Inivalidate GPT Information by PA,
+ * All Entries, Outer Shareable)
+ */
+static inline void tlbipaallos(void)
+{
+	__asm__("SYS #6,c8,c1,#4");
+}
+
+/*
+ * Invalidate TLBs of GPT entries by Physical address, last level.
+ *
+ * @pa: the starting address for the range
+ *      of invalidation
+ * @size: size of the range of invalidation
+ */
+void gpt_tlbi_by_pa_ll(uint64_t pa, size_t size);
+
+
+/* Previously defined accessor functions with incomplete register names  */
 
 #define read_current_el()	read_CurrentEl()
 

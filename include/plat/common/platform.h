@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2022, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,6 +16,7 @@
 #if TRNG_SUPPORT
 #include "plat_trng.h"
 #endif
+#include <drivers/fwu/fwu_metadata.h>
 
 /*******************************************************************************
  * Forward declarations
@@ -121,6 +122,26 @@ const char *plat_log_get_prefix(unsigned int log_level);
 void bl2_plat_preload_setup(void);
 int plat_try_next_boot_source(void);
 
+#if MEASURED_BOOT
+int plat_mboot_measure_image(unsigned int image_id, image_info_t *image_data);
+int plat_mboot_measure_critical_data(unsigned int critical_data_id,
+				     const void *base,
+				     size_t size);
+#else
+static inline int plat_mboot_measure_image(unsigned int image_id __unused,
+					   image_info_t *image_data __unused)
+{
+	return 0;
+}
+static inline int plat_mboot_measure_critical_data(
+					unsigned int critical_data_id __unused,
+					const void *base __unused,
+					size_t size __unused)
+{
+	return 0;
+}
+#endif /* MEASURED_BOOT */
+
 /*******************************************************************************
  * Mandatory BL1 functions
  ******************************************************************************/
@@ -140,6 +161,8 @@ int plat_sdei_validate_entry_point(uintptr_t ep, unsigned int client_mode);
 void plat_sdei_handle_masked_trigger(uint64_t mpidr, unsigned int intr);
 #endif
 
+void plat_default_ea_handler(unsigned int ea_reason, uint64_t syndrome, void *cookie,
+		void *handle, uint64_t flags);
 void plat_ea_handler(unsigned int ea_reason, uint64_t syndrome, void *cookie,
 		void *handle, uint64_t flags);
 
@@ -179,12 +202,16 @@ int bl1_plat_handle_pre_image_load(unsigned int image_id);
 int bl1_plat_handle_post_image_load(unsigned int image_id);
 
 #if MEASURED_BOOT
-/*
- * Calculates and writes BL2 hash data to the platform's defined location.
- * For ARM platforms the data are written to TB_FW_CONFIG DTB.
- */
-void bl1_plat_set_bl2_hash(const image_desc_t *image_desc);
-#endif
+void bl1_plat_mboot_init(void);
+void bl1_plat_mboot_finish(void);
+#else
+static inline void bl1_plat_mboot_init(void)
+{
+}
+static inline void bl1_plat_mboot_finish(void)
+{
+}
+#endif /* MEASURED_BOOT */
 
 /*******************************************************************************
  * Mandatory BL2 functions
@@ -205,9 +232,16 @@ int bl2_plat_handle_post_image_load(unsigned int image_id);
  * Optional BL2 functions (may be overridden)
  ******************************************************************************/
 #if MEASURED_BOOT
-/* Read TCG_DIGEST_SIZE bytes of BL2 hash data */
-void bl2_plat_get_hash(void *data);
-#endif
+void bl2_plat_mboot_init(void);
+void bl2_plat_mboot_finish(void);
+#else
+static inline void bl2_plat_mboot_init(void)
+{
+}
+static inline void bl2_plat_mboot_finish(void)
+{
+}
+#endif /* MEASURED_BOOT */
 
 /*******************************************************************************
  * Mandatory BL2 at EL3 functions: Must be implemented if BL2_AT_EL3 image is
@@ -269,6 +303,14 @@ plat_local_state_t plat_get_target_pwr_state(unsigned int lvl,
 			unsigned int ncpu);
 
 /*******************************************************************************
+ * Mandatory BL31 functions when ENABLE_RME=1
+ ******************************************************************************/
+int plat_get_cca_attest_token(uintptr_t buf, size_t *len,
+			       uintptr_t hash, size_t hash_size);
+int plat_get_cca_realm_attest_key(uintptr_t buf, size_t *len,
+				   unsigned int type);
+
+/*******************************************************************************
  * Optional BL31 functions (may be overridden)
  ******************************************************************************/
 void bl31_plat_enable_mmu(uint32_t flags);
@@ -305,6 +347,10 @@ int plat_spm_sp_get_next_address(void **sp_base, size_t *sp_size,
 int plat_spm_core_manifest_load(spmc_manifest_attribute_t *manifest,
 				const void *pm_addr);
 #endif
+#if defined(SPMC_AT_EL3)
+int plat_spmc_shmem_datastore_get(uint8_t **datastore, size_t *size);
+#endif
+
 /*******************************************************************************
  * Mandatory BL image load functions(may be overridden).
  ******************************************************************************/
@@ -348,5 +394,14 @@ int32_t plat_get_soc_revision(void);
  * Optional function to check for SMCCC function availability for platform
  */
 int32_t plat_is_smccc_feature_available(u_register_t fid);
+
+/*******************************************************************************
+ * FWU platform specific functions
+ ******************************************************************************/
+int plat_fwu_set_metadata_image_source(unsigned int image_id,
+				       uintptr_t *dev_handle,
+				       uintptr_t *image_spec);
+void plat_fwu_set_images_source(const struct fwu_metadata *metadata);
+uint32_t plat_fwu_get_boot_idx(void);
 
 #endif /* PLATFORM_H */

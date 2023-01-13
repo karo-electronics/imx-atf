@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2020, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2018-2021, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -19,6 +19,11 @@ HANDLE_EA_EL3_FIRST		:=	0
 CSS_SGI_CHIP_COUNT		:=	1
 
 CSS_SGI_PLATFORM_VARIANT	:=	0
+
+# Do not enable SVE
+ENABLE_SVE_FOR_NS		:=	0
+
+CTX_INCLUDE_FPREGS		:=	1
 
 INTERCONNECT_SOURCES	:=	${CSS_ENT_BASE}/sgi_interconnect.c
 
@@ -65,6 +70,8 @@ override CSS_LOAD_SCP_IMAGES	:=	0
 override NEED_BL2U		:=	no
 override ARM_BL31_IN_DRAM	:=	1
 override ARM_PLAT_MT		:=	1
+override PSCI_EXTENDED_STATE_ID	:=	1
+override ARM_RECOM_STATE_ID_ENC	:=	1
 
 # System coherency is managed in hardware
 HW_ASSISTED_COHERENCY	:=	1
