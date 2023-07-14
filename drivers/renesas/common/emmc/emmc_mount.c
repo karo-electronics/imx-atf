@@ -15,6 +15,8 @@
 #include "micro_delay.h"
 #include "rcar_def.h"
 
+#define MMC_CMD1_TIMEOUT		3000
+
 static EMMC_ERROR_CODE emmc_clock_ctrl(uint8_t mode);
 static EMMC_ERROR_CODE emmc_card_init(void);
 static EMMC_ERROR_CODE emmc_high_speed(void);
@@ -89,7 +91,7 @@ static EMMC_ERROR_CODE emmc_card_init(void)
 
 	/* CMD1 */
 	emmc_make_nontrans_cmd(CMD1_SEND_OP_COND, EMMC_HOST_OCR_VALUE);
-	for (retry = 300; retry > 0; retry--) {
+	for (retry = MMC_CMD1_TIMEOUT; retry > 0; retry--) {
 		result =
 		    emmc_exec_cmd(EMMC_R1_ERROR_MASK, mmc_drv_obj.response);
 		if (result != EMMC_SUCCESS) {
@@ -104,6 +106,7 @@ static EMMC_ERROR_CODE emmc_card_init(void)
 	}
 
 	if (retry == 0) {
+		ERROR("CMD1_SEND_OP_COND timed out\n");
 		emmc_write_error_info(EMMC_FUNCNO_CARD_INIT, EMMC_ERR_TIMEOUT);
 		return EMMC_ERR_TIMEOUT;
 	}
